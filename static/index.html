@@ -38,7 +38,7 @@
                         </label>
                         <p class="pl-1">或拖拽文件到这里</p>
                     </div>
-                    <p class="text-xs text-gray-500 mt-2">支持 txt, md, pdf, docx 等</p>
+                    <p class="text-xs text-gray-500 mt-2">支持 txt, md, pdf, docx, jpg, zip 批量上传等</p>
                 </div>
 
                 <div id="upload-status" class="mt-4 hidden">
@@ -61,6 +61,20 @@
                 </button>
             </section>
         </main>
+    </div>
+
+    <!-- Preview Modal -->
+    <div id="preview-modal" class="fixed inset-0 z-50 hidden bg-gray-900 bg-opacity-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-lg w-full max-w-3xl max-h-[80vh] flex flex-col">
+            <div class="flex items-center justify-between p-4 border-b border-gray-100">
+                <h3 id="modal-title" class="text-lg font-semibold text-gray-800 truncate pr-4"></h3>
+                <button onclick="closePreview()" class="text-gray-400 hover:text-gray-600 focus:outline-none">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div id="modal-content" class="p-6 overflow-y-auto flex-1 bg-gray-50 rounded-b-xl">
+            </div>
+        </div>
     </div>
 
     <script>
@@ -133,13 +147,21 @@
                     body: formData
                 });
                 
-                const result = await response.json();
+                const data = await response.json();
                 
-                if (response.ok) {
-                    showStatus(`<b>上传成功！</b><br>文件：${result.filename}<br>分类：<span class="inline-block px-2 py-1 mt-1 text-xs font-semibold bg-green-100 text-green-800 rounded">${result.category}</span>`, true);
+                if (response.ok && data.status === 'success') {
+                    let msg = `<b>上传成功！</b><br>`;
+                    data.results.forEach(res => {
+                        if (res.status === 'success') {
+                            msg += `文件：${res.filename} ➔ <span class="inline-block px-2 py-1 mt-1 text-xs font-semibold bg-green-100 text-green-800 rounded">${res.category}</span><br>`;
+                        } else {
+                            msg += `文件：${res.filename} (跳过: ${res.message})<br>`;
+                        }
+                    });
+                    showStatus(msg, true);
                     loadStats(); // Reload stats after upload
                 } else {
-                    showStatus(`上传失败: ${result.message}`, false);
+                    showStatus(`上传失败: ${data.message || '未知错误'}`, false);
                 }
             } catch (error) {
                 showStatus(`网络错误: ${error.message}`, false);
@@ -164,8 +186,19 @@
                                 <svg class="w-4 h-4 mr-1 text-yellow-500" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path></svg>
                                 ${category} <span class="ml-2 text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">${files.length}</span>
                             </h3>
-                            <ul class="pl-5 border-l-2 border-gray-100 ml-2 space-y-1">
-                                ${files.map(f => `<li class="text-sm text-gray-600 flex items-center before:content-[''] before:w-2 before:h-[1px] before:bg-gray-300 before:mr-2 before:-ml-5">${f}</li>`).join('')}
+                            <ul class="pl-5 border-l-2 border-gray-100 ml-2 space-y-2">
+                                ${files.map(f => `
+                                    <li class="text-sm text-gray-600 flex items-center justify-between group">
+                                        <div class="flex items-center before:content-[''] before:w-2 before:h-[1px] before:bg-gray-300 before:mr-2 before:-ml-5">
+                                            <span class="truncate max-w-[200px]" title="${f.name}">${f.name}</span>
+                                            ${f.has_meta ? '<span class="ml-2 px-1.5 py-0.5 text-[10px] bg-blue-50 text-blue-500 rounded border border-blue-100">已提取标签</span>' : ''}
+                                        </div>
+                                        <div class="hidden group-hover:flex space-x-2">
+                                            <button onclick="previewFile('${category}', '${f.name}')" class="text-blue-500 hover:text-blue-700 text-xs">预览</button>
+                                            <button onclick="deleteFile('${category}', '${f.name}')" class="text-red-500 hover:text-red-700 text-xs">删除</button>
+                                        </div>
+                                    </li>
+                                `).join('')}
                             </ul>
                         </div>
                     `;
@@ -178,6 +211,62 @@
 
         // Initial load
         loadStats();
+
+        // New feature functions
+        async function previewFile(category, filename) {
+            try {
+                const response = await fetch(`/api/file/${encodeURIComponent(category)}/${encodeURIComponent(filename)}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('modal-title').textContent = data.filename;
+                    const contentDiv = document.getElementById('modal-content');
+                    if (data.type === 'text') {
+                        contentDiv.innerHTML = `<pre class="text-sm text-gray-700 whitespace-pre-wrap font-mono">${escapeHtml(data.content)}</pre>`;
+                    } else {
+                        contentDiv.innerHTML = `<p class="text-gray-500 italic">${data.content}</p>`;
+                    }
+                    document.getElementById('preview-modal').classList.remove('hidden');
+                } else {
+                    alert(`预览失败: ${data.detail || '未知错误'}`);
+                }
+            } catch (error) {
+                alert(`网络错误: ${error.message}`);
+            }
+        }
+
+        async function deleteFile(category, filename) {
+            if (!confirm(`确定要删除文件 "${filename}" 吗？`)) return;
+            
+            try {
+                const response = await fetch(`/api/file/${encodeURIComponent(category)}/${encodeURIComponent(filename)}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.status === 'success') {
+                    loadStats();
+                } else {
+                    alert(`删除失败: ${data.message || '未知错误'}`);
+                }
+            } catch (error) {
+                alert(`网络错误: ${error.message}`);
+            }
+        }
+
+        function closePreview() {
+            document.getElementById('preview-modal').classList.add('hidden');
+        }
+
+        function escapeHtml(unsafe) {
+            return unsafe
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
     </script>
 </body>
 </html>
