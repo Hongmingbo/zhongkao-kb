@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中考知识库 (Zhongkao Knowledge Base)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .dragover {
+            border-color: #3b82f6 !important;
+            background-color: #eff6ff !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen text-gray-800 font-sans">
+    <div class="max-w-4xl mx-auto py-10 px-4">
+        <header class="mb-10 text-center">
+            <h1 class="text-4xl font-bold text-blue-600 mb-2">中考知识库</h1>
+            <p class="text-gray-500">Hermes 智能助手专用文件库 · 自动分类与管理</p>
+        </header>
+
+        <main class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- 上传区域 -->
+            <section class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    上传文件
+                </h2>
+                
+                <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center transition-colors duration-200 cursor-pointer hover:border-blue-400 hover:bg-gray-50">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <div class="mt-4 flex text-sm text-gray-600 justify-center">
+                        <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                            <span>选择文件</span>
+                            <input id="file-upload" name="file-upload" type="file" class="sr-only">
+                        </label>
+                        <p class="pl-1">或拖拽文件到这里</p>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">支持 txt, md, pdf, docx 等</p>
+                </div>
+
+                <div id="upload-status" class="mt-4 hidden">
+                    <div class="p-4 rounded-md"></div>
+                </div>
+            </section>
+
+            <!-- 知识库概览 -->
+            <section class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                    知识库结构
+                </h2>
+                <div id="kb-stats" class="space-y-4 max-h-[400px] overflow-y-auto">
+                    <p class="text-gray-500 text-sm">加载中...</p>
+                </div>
+                <button onclick="loadStats()" class="mt-4 text-sm text-blue-500 hover:text-blue-700 flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    刷新目录
+                </button>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-upload');
+        const uploadStatus = document.getElementById('upload-status');
+        const statusDiv = uploadStatus.querySelector('div');
+        const kbStats = document.getElementById('kb-stats');
+
+        // Drag and drop events
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            dropZone.classList.add('dragover');
+        }
+
+        function unhighlight(e) {
+            dropZone.classList.remove('dragover');
+        }
+
+        dropZone.addEventListener('drop', handleDrop, false);
+        fileInput.addEventListener('change', function(e) {
+            handleFiles(this.files);
+        });
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+
+        function handleFiles(files) {
+            if (files.length === 0) return;
+            const file = files[0]; // Upload one by one for simplicity
+            uploadFile(file);
+        }
+
+        function showStatus(message, isSuccess) {
+            uploadStatus.classList.remove('hidden');
+            statusDiv.className = `p-4 rounded-md text-sm ${isSuccess ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`;
+            statusDiv.innerHTML = message;
+        }
+
+        async function uploadFile(file) {
+            showStatus(`正在上传: ${file.name}...`, true);
+            statusDiv.classList.replace('bg-green-50', 'bg-blue-50');
+            statusDiv.classList.replace('text-green-800', 'text-blue-800');
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus(`<b>上传成功！</b><br>文件：${result.filename}<br>分类：<span class="inline-block px-2 py-1 mt-1 text-xs font-semibold bg-green-100 text-green-800 rounded">${result.category}</span>`, true);
+                    loadStats(); // Reload stats after upload
+                } else {
+                    showStatus(`上传失败: ${result.message}`, false);
+                }
+            } catch (error) {
+                showStatus(`网络错误: ${error.message}`, false);
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                
+                if (Object.keys(data).length === 0) {
+                    kbStats.innerHTML = '<p class="text-gray-500 text-sm text-center py-8">知识库还是空的，快去上传文件吧！</p>';
+                    return;
+                }
+
+                let html = '';
+                for (const [category, files] of Object.entries(data)) {
+                    html += `
+                        <div class="mb-4">
+                            <h3 class="text-md font-medium text-gray-700 flex items-center mb-2">
+                                <svg class="w-4 h-4 mr-1 text-yellow-500" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path></svg>
+                                ${category} <span class="ml-2 text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">${files.length}</span>
+                            </h3>
+                            <ul class="pl-5 border-l-2 border-gray-100 ml-2 space-y-1">
+                                ${files.map(f => `<li class="text-sm text-gray-600 flex items-center before:content-[''] before:w-2 before:h-[1px] before:bg-gray-300 before:mr-2 before:-ml-5">${f}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                }
+                kbStats.innerHTML = html;
+            } catch (error) {
+                kbStats.innerHTML = `<p class="text-red-500 text-sm">加载失败: ${error.message}</p>`;
+            }
+        }
+
+        // Initial load
+        loadStats();
+    </script>
+</body>
+</html>
