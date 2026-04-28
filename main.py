@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 
 # Additional imports for new features
 try:
@@ -22,6 +23,19 @@ except ImportError:
     docx = None
 
 app = FastAPI(title="中考知识库 (Zhongkao Knowledge Base)")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "https://zhongkao-kb.pages.dev",
+    ],
+    allow_origin_regex=r"^https://.*\.pages\.dev$",
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 BASE_DIR = Path(__file__).parent
 KNOWLEDGE_BASE_DIR = BASE_DIR / "knowledge_base"
