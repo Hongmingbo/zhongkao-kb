@@ -109,7 +109,8 @@
     function loadApiBase() {
       const saved = localStorage.getItem('ZKKB_API_BASE') || ''
       const urlParam = new URLSearchParams(location.search).get('api') || ''
-      apiBaseInput.value = (urlParam || saved || '').trim()
+      const defaultBase = 'https://hmingbo-zhongkao-kb-api.hf.space'
+      apiBaseInput.value = (urlParam || saved || defaultBase).trim()
     }
 
     function setApiStatus(text, ok) {
