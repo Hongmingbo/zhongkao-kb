@@ -22,6 +22,13 @@ try:
 except ImportError:
     docx = None
 
+try:
+    import pytesseract
+    from PIL import Image
+except ImportError:
+    pytesseract = None
+    Image = None
+
 app = FastAPI(title="中考知识库 (Zhongkao Knowledge Base)")
 
 app.add_middleware(
@@ -129,7 +136,7 @@ def extract_text_from_file(file_path: Path) -> str:
     elif ext in ['.docx', '.doc'] and docx:
         try:
             doc = docx.Document(file_path)
-            text = "\n".join(para.text for page in doc.paragraphs for para in doc.paragraphs)
+            text = "\n".join(para.text for para in doc.paragraphs)
         except Exception:
             pass
     elif ext in ['.txt', '.md', '.csv']:
@@ -138,10 +145,24 @@ def extract_text_from_file(file_path: Path) -> str:
         except Exception:
             pass
     elif ext in ['.jpg', '.jpeg', '.png']:
-        # Feature 2: Mock OCR for testing in sandbox where Tesseract is not installed
-        text = f"【模拟OCR提取结果】这是一道识别自图片 {file_path.name} 的测试题目。\n1. 请计算图中函数的解析式。\n2. (2023年北京中考题)"
+        if pytesseract and Image:
+            try:
+                text = pytesseract.image_to_string(Image.open(file_path), lang="chi_sim+eng")
+            except Exception:
+                text = ""
+        if not text.strip():
+            text = f"【未提取到有效文本：图片 OCR 失败或未安装 OCR 依赖】\n文件：{file_path.name}"
         
     return text
+
+def placeholder_for(ext: str) -> str:
+    if ext == ".pdf":
+        return "【未提取到有效文本：该 PDF 可能是扫描件/图片型 PDF，当前未启用 PDF-OCR】"
+    if ext in [".doc", ".docx"]:
+        return "【未提取到有效文本：Word 文档解析失败】"
+    if ext in [".jpg", ".jpeg", ".png"]:
+        return "【未提取到有效文本：图片 OCR 失败】"
+    return "【未提取到有效文本】"
 
 def chunk_text(text: str) -> str:
     """Feature 3: 试卷自动拆题与切块。添加Markdown分隔符。"""
@@ -186,7 +207,7 @@ def process_single_file(file_path: Path, original_filename: str) -> dict:
             
         chunked_text = chunk_text(text_content)
         if not chunked_text.strip():
-            chunked_text = "【未提取到有效文本】"
+            chunked_text = placeholder_for(ext)
         final_path.write_text(chunked_text, encoding='utf-8')
     else:
         # 普通文本文件直接复制，但也可以进行切块处理
@@ -272,6 +293,20 @@ async def get_stats():
             if files:
                 stats[item.name] = files
     return stats
+
+@app.delete("/api/clear")
+async def clear_knowledge_base():
+    try:
+        for item in KNOWLEDGE_BASE_DIR.iterdir():
+            if item.name == ".gitkeep":
+                continue
+            if item.is_dir():
+                shutil.rmtree(item)
+            else:
+                item.unlink(missing_ok=True)
+        return {"status": "success", "message": "知识库已清空"}
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 # Feature 7: 在线文件预览
 @app.get("/api/file/{category}/{filename}")

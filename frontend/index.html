@@ -38,18 +38,16 @@
           上传文件
         </h2>
 
-        <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center transition-colors duration-200 cursor-pointer hover:border-blue-400 hover:bg-gray-50">
+        <div id="drop-zone" class="relative border-2 border-dashed border-gray-300 rounded-lg p-10 text-center transition-colors duration-200 hover:border-blue-400 hover:bg-gray-50">
           <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
             <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
           </svg>
           <div class="mt-4 flex text-sm text-gray-600 justify-center">
-            <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
-              <span>选择文件</span>
-              <input id="file-upload" name="file-upload" type="file" class="sr-only">
-            </label>
+            <span class="relative bg-white rounded-md font-medium text-blue-600">选择文件</span>
             <p class="pl-1">或拖拽文件到这里</p>
           </div>
           <p class="text-xs text-gray-500 mt-2">支持 txt, md, pdf, docx, jpg, zip 批量上传等</p>
+          <input id="file-upload" name="file-upload" type="file" class="absolute inset-0 opacity-0 cursor-pointer">
         </div>
 
         <div id="upload-status" class="mt-4 hidden">
@@ -65,10 +63,16 @@
         <div id="kb-stats" class="space-y-4 max-h-[420px] overflow-y-auto">
           <p class="text-gray-500 text-sm">加载中...</p>
         </div>
-        <button id="refreshBtn" class="mt-4 text-sm text-blue-500 hover:text-blue-700 flex items-center">
-          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-          刷新目录
-        </button>
+        <div class="flex gap-4 mt-4">
+          <button id="refreshBtn" class="text-sm text-blue-500 hover:text-blue-700 flex items-center">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            刷新目录
+          </button>
+          <button id="clearBtn" class="text-sm text-red-500 hover:text-red-700 flex items-center">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            清空知识库
+          </button>
+        </div>
       </section>
     </main>
   </div>
@@ -96,6 +100,7 @@
     const saveApiBaseBtn = document.getElementById('saveApiBase')
     const checkApiBtn = document.getElementById('checkApi')
     const refreshBtn = document.getElementById('refreshBtn')
+    const clearBtn = document.getElementById('clearBtn')
     const previewModal = document.getElementById('preview-modal')
     const modalTitle = document.getElementById('modal-title')
     const modalContent = document.getElementById('modal-content')
@@ -110,7 +115,9 @@
       const saved = localStorage.getItem('ZKKB_API_BASE') || ''
       const urlParam = new URLSearchParams(location.search).get('api') || ''
       const defaultBase = 'https://hmingbo-zhongkao-kb-api.hf.space'
-      apiBaseInput.value = (urlParam || saved || defaultBase).trim()
+      const v = (urlParam || saved || defaultBase).trim()
+      apiBaseInput.value = v
+      if (!saved && !urlParam && v) localStorage.setItem('ZKKB_API_BASE', v.replace(/\/+$/, ''))
     }
 
     function setApiStatus(text, ok) {
@@ -302,6 +309,23 @@
     })
     checkApiBtn.addEventListener('click', checkApi)
     refreshBtn.addEventListener('click', loadStats)
+    clearBtn.addEventListener('click', async () => {
+      const base = getApiBase()
+      if (!base) return
+      if (!confirm('确定要清空知识库吗？')) return
+      try {
+        const r = await fetch(base + '/api/clear', { method: 'DELETE' })
+        const data = await r.json().catch(() => ({}))
+        if (r.ok && data.status === 'success') {
+          showStatus('知识库已清空。', true)
+          await loadStats()
+          return
+        }
+        showStatus('清空失败: ' + escapeHtml(data.message || String(r.status)), false)
+      } catch (e) {
+        showStatus('清空失败: ' + escapeHtml(e && e.message ? e.message : String(e)), false)
+      }
+    })
 
     function escapeHtml(unsafe) {
       return String(unsafe)
