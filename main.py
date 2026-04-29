@@ -24,15 +24,21 @@ except ImportError:
 
 try:
     import pytesseract
-    from PIL import Image
+    from PIL import Image, ImageChops, ImageFilter, ImageOps
 except ImportError:
     pytesseract = None
     Image = None
+    ImageChops = None
+    ImageFilter = None
+    ImageOps = None
 
 try:
     from pdf2image import convert_from_path
 except ImportError:
     convert_from_path = None
+
+TESSERACT_CONFIG = "--oem 1 --psm 6"
+MAX_PDF_OCR_PAGES = 8
 
 app = FastAPI(title="中考知识库 (Zhongkao Knowledge Base)")
 
@@ -126,6 +132,26 @@ def extract_metadata(filename: str, text_content: str, original_md5: str) -> dic
         
     return meta
 
+def preprocess_ocr_image(img: "Image.Image") -> "Image.Image":
+    if not (Image and ImageOps and ImageFilter and ImageChops):
+        return img
+    base = img.convert("RGB")
+    r, g, b = base.split()
+    m1 = ImageChops.subtract(r, g).point(lambda p: 255 if p > 40 else 0)
+    m2 = ImageChops.subtract(r, b).point(lambda p: 255 if p > 40 else 0)
+    m3 = r.point(lambda p: 255 if p > 140 else 0)
+    mask = ImageChops.multiply(ImageChops.multiply(m1, m2), m3)
+    cleaned = Image.composite(Image.new("RGB", base.size, (255, 255, 255)), base, mask)
+    gray = cleaned.convert("L")
+    gray = ImageOps.autocontrast(gray)
+    gray = gray.filter(ImageFilter.MedianFilter(size=3))
+    if hasattr(Image, "Resampling"):
+        resample = Image.Resampling.LANCZOS
+    else:
+        resample = Image.LANCZOS
+    gray = gray.resize((gray.size[0] * 2, gray.size[1] * 2), resample=resample)
+    return gray
+
 def extract_text_from_file(file_path: Path) -> str:
     """Feature 1 & 2: 提取文本内容，用于转换Markdown或切块。"""
     ext = file_path.suffix.lower()
@@ -145,10 +171,10 @@ def extract_text_from_file(file_path: Path) -> str:
             pass
         if not text.strip() and convert_from_path and pytesseract and Image:
             try:
-                images = convert_from_path(str(file_path), dpi=220, fmt="png")
+                images = convert_from_path(str(file_path), dpi=320, fmt="png", first_page=1, last_page=MAX_PDF_OCR_PAGES)
                 ocr_parts = []
                 for idx, img in enumerate(images, start=1):
-                    t = pytesseract.image_to_string(img, lang="chi_sim+eng")
+                    t = pytesseract.image_to_string(preprocess_ocr_image(img), lang="chi_sim+eng", config=TESSERACT_CONFIG)
                     if t and t.strip():
                         ocr_parts.append(f"第{idx}页\n{t.strip()}")
                 text = "\n\n".join(ocr_parts)
@@ -168,7 +194,7 @@ def extract_text_from_file(file_path: Path) -> str:
     elif ext in ['.jpg', '.jpeg', '.png']:
         if pytesseract and Image:
             try:
-                text = pytesseract.image_to_string(Image.open(file_path), lang="chi_sim+eng")
+                text = pytesseract.image_to_string(preprocess_ocr_image(Image.open(file_path)), lang="chi_sim+eng", config=TESSERACT_CONFIG)
             except Exception:
                 text = ""
         if not text.strip():
