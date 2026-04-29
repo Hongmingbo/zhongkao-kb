@@ -495,6 +495,93 @@ async def get_daily_quote():
     q = quotes[idx]
     return {"date": date_str, **q}
 
+@app.get("/api/filters/options")
+async def get_filter_options():
+    categories = sorted([p.name for p in KNOWLEDGE_BASE_DIR.iterdir() if p.is_dir()])
+
+    exts = set()
+    years = set()
+    regions = set()
+    types = set()
+
+    for cat in categories:
+        d = KNOWLEDGE_BASE_DIR / cat
+        for f in d.iterdir():
+            if not f.is_file():
+                continue
+            if f.name.endswith(".meta.json"):
+                continue
+
+            ext = f.suffix.lower().lstrip(".")
+            if ext:
+                exts.add(ext)
+
+            meta_path = f.with_name(f.name + ".meta.json")
+            if meta_path.exists():
+                try:
+                    meta = json.loads(meta_path.read_text(encoding="utf-8", errors="ignore") or "{}")
+                except Exception:
+                    meta = {}
+                y = meta.get("year")
+                r = meta.get("region")
+                t = meta.get("type")
+                if isinstance(y, str) and y:
+                    years.add(y)
+                if isinstance(r, str) and r:
+                    regions.add(r)
+                if isinstance(t, str) and t:
+                    types.add(t)
+
+    return {
+        "categories": categories,
+        "years": sorted(years),
+        "regions": sorted(regions),
+        "types": sorted(types),
+        "exts": sorted(exts),
+    }
+
+@app.get("/api/filter")
+async def filter_files(
+    category: Optional[str] = Query(None),
+    year: Optional[str] = Query(None),
+    region: Optional[str] = Query(None),
+    type: Optional[str] = Query(None),
+    ext: Optional[str] = Query(None),
+):
+    ext_norm = (ext or "").strip().lower().lstrip(".") or None
+    need_meta = any([(year or "").strip(), (region or "").strip(), (type or "").strip()])
+
+    stats = {}
+    for cat, f in _iter_target_files(KNOWLEDGE_BASE_DIR, category):
+        if ext_norm and f.suffix.lower().lstrip(".") != ext_norm:
+            continue
+
+        meta_path = f.with_name(f.name + ".meta.json")
+        has_meta = meta_path.exists()
+
+        if need_meta:
+            if not has_meta:
+                continue
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8", errors="ignore") or "{}")
+            except Exception:
+                meta = {}
+            if year and meta.get("year") != year:
+                continue
+            if region and meta.get("region") != region:
+                continue
+            if type and meta.get("type") != type:
+                continue
+
+        stats.setdefault(cat, []).append({"name": f.name, "has_meta": has_meta})
+
+    for cat in list(stats.keys()):
+        stats[cat].sort(key=lambda x: x["name"])
+        if not stats[cat]:
+            del stats[cat]
+
+    return stats
+
 @app.delete("/api/clear")
 async def clear_knowledge_base():
     try:

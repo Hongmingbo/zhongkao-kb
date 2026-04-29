@@ -57,6 +57,30 @@
             <button id="clearSearchBtn" class="px-4 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm hover:bg-gray-200">清除</button>
           </div>
         </div>
+        <div class="rounded-lg border border-gray-100 bg-white p-3 mb-4">
+          <div class="text-sm font-medium text-gray-700 mb-2">筛选面板</div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <select id="filterCategory" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">全部学科</option>
+            </select>
+            <select id="filterYear" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">全部年份</option>
+            </select>
+            <select id="filterRegion" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">全部地区</option>
+            </select>
+            <select id="filterType" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">全部类型</option>
+            </select>
+            <select id="filterExt" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">全部后缀</option>
+            </select>
+            <div class="flex gap-2">
+              <button id="applyFiltersBtn" class="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">应用筛选</button>
+              <button id="clearFiltersBtn" class="flex-1 px-4 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm hover:bg-gray-200">清除筛选</button>
+            </div>
+          </div>
+        </div>
         <div id="search-results" class="hidden mb-4"></div>
         <div id="kb-stats" class="space-y-4 max-h-[420px] overflow-y-auto">
           <p class="text-gray-500 text-sm">加载中...</p>
@@ -100,6 +124,13 @@
     const searchCategorySelect = document.getElementById('searchCategory')
     const searchBtn = document.getElementById('searchBtn')
     const clearSearchBtn = document.getElementById('clearSearchBtn')
+    const filterCategorySelect = document.getElementById('filterCategory')
+    const filterYearSelect = document.getElementById('filterYear')
+    const filterRegionSelect = document.getElementById('filterRegion')
+    const filterTypeSelect = document.getElementById('filterType')
+    const filterExtSelect = document.getElementById('filterExt')
+    const applyFiltersBtn = document.getElementById('applyFiltersBtn')
+    const clearFiltersBtn = document.getElementById('clearFiltersBtn')
     const searchResults = document.getElementById('search-results')
     const previewModal = document.getElementById('preview-modal')
     const modalTitle = document.getElementById('modal-title')
@@ -112,6 +143,7 @@
     let activeUploads = 0
     const API_BASE = 'https://hmingbo-zhongkao-kb-api.hf.space'
     const QUOTE_CACHE_KEY = 'ZKKB_DAILY_QUOTE'
+    let filterActive = false
 
     function getApiBase() {
       return API_BASE
@@ -330,7 +362,7 @@
       try {
         const response = await fetch(base + '/api/stats')
         const data = await response.json()
-        updateSearchCategories(data)
+        await loadFilterOptions()
         if (!data || Object.keys(data).length === 0) {
           kbStats.innerHTML = '<p class="text-gray-500 text-sm text-center py-8">知识库还是空的，快去上传文件吧！</p>'
           return
@@ -366,15 +398,107 @@
       }
     }
 
-    function updateSearchCategories(data) {
-      const current = searchCategorySelect.value || ''
-      const keys = data && typeof data === 'object' ? Object.keys(data) : []
-      const options = ['<option value="">全部学科</option>']
-      keys.sort().forEach(k => {
-        options.push(`<option value="${escapeAttr(k)}">${escapeHtml(k)}</option>`)
-      })
-      searchCategorySelect.innerHTML = options.join('')
-      searchCategorySelect.value = current
+    async function loadFilterOptions() {
+      const base = getApiBase()
+      try {
+        const r = await fetch(base + '/api/filters/options')
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok) return
+
+        const setOptions = (el, placeholder, values) => {
+          const current = el.value || ''
+          const opts = [`<option value="">${escapeHtml(placeholder)}</option>`]
+          ;(values || []).forEach(v => {
+            opts.push(`<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`)
+          })
+          el.innerHTML = opts.join('')
+          el.value = current
+        }
+
+        setOptions(searchCategorySelect, '全部学科', data.categories || [])
+        setOptions(filterCategorySelect, '全部学科', data.categories || [])
+        setOptions(filterYearSelect, '全部年份', data.years || [])
+        setOptions(filterRegionSelect, '全部地区', data.regions || [])
+        setOptions(filterTypeSelect, '全部类型', data.types || [])
+        setOptions(filterExtSelect, '全部后缀', data.exts || [])
+      } catch (e) {}
+    }
+
+    function getFilters() {
+      const category = (filterCategorySelect.value || '').trim()
+      const year = (filterYearSelect.value || '').trim()
+      const region = (filterRegionSelect.value || '').trim()
+      const type = (filterTypeSelect.value || '').trim()
+      const ext = (filterExtSelect.value || '').trim()
+      return { category, year, region, type, ext }
+    }
+
+    async function applyFilters() {
+      const base = getApiBase()
+      const { category, year, region, type, ext } = getFilters()
+      const params = new URLSearchParams()
+      if (category) params.set('category', category)
+      if (year) params.set('year', year)
+      if (region) params.set('region', region)
+      if (type) params.set('type', type)
+      if (ext) params.set('ext', ext)
+
+      try {
+        const r = await fetch(base + '/api/filter?' + params.toString())
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok) {
+          kbStats.innerHTML = `<p class="text-red-500 text-sm">筛选失败: ${escapeHtml((data && data.message) || String(r.status))}</p>`
+          return
+        }
+        filterActive = true
+        clearSearch()
+        renderGroupedFiles(data)
+      } catch (e) {
+        kbStats.innerHTML = `<p class="text-red-500 text-sm">筛选失败: ${escapeHtml(e && e.message ? e.message : String(e))}</p>`
+      }
+    }
+
+    function clearFilters(reload = true) {
+      filterActive = false
+      filterCategorySelect.value = ''
+      filterYearSelect.value = ''
+      filterRegionSelect.value = ''
+      filterTypeSelect.value = ''
+      filterExtSelect.value = ''
+      if (reload) loadStats()
+    }
+
+    function renderGroupedFiles(data) {
+      if (!data || Object.keys(data).length === 0) {
+        kbStats.innerHTML = '<p class="text-gray-500 text-sm text-center py-8">没有匹配的文件。</p>'
+        return
+      }
+      let html = ''
+      for (const [category, files] of Object.entries(data)) {
+        html += `
+          <div class="mb-4">
+            <h3 class="text-md font-medium text-gray-700 flex items-center mb-2">
+              <svg class="w-4 h-4 mr-1 text-yellow-500" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path></svg>
+              ${escapeHtml(category)} <span class="ml-2 text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">${files.length}</span>
+            </h3>
+            <ul class="pl-5 border-l-2 border-gray-100 ml-2 space-y-2">
+              ${files.map(f => `
+                <li class="text-sm text-gray-600 flex items-center justify-between group">
+                  <div class="flex items-center before:content-[''] before:w-2 before:h-[1px] before:bg-gray-300 before:mr-2 before:-ml-5">
+                    <span class="truncate max-w-[220px]" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
+                    ${f.has_meta ? '<span class="ml-2 px-1.5 py-0.5 text-[10px] bg-blue-50 text-blue-500 rounded border border-blue-100">已提取标签</span>' : ''}
+                  </div>
+                  <div class="hidden group-hover:flex space-x-2">
+                    <button class="text-blue-500 hover:text-blue-700 text-xs" data-action="preview" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">预览</button>
+                    <button class="text-red-500 hover:text-red-700 text-xs" data-action="delete" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">删除</button>
+                  </div>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        `
+      }
+      kbStats.innerHTML = html
     }
 
     async function runSearch() {
@@ -494,7 +618,8 @@
         const response = await fetch(url, { method: 'DELETE' })
         const data = await response.json().catch(() => ({}))
         if (response.ok && data.status === 'success') {
-          await loadStats()
+          if (filterActive) await applyFilters()
+          else await loadStats()
           return
         }
         alert('删除失败: ' + (data.message || String(response.status)))
@@ -505,10 +630,12 @@
 
     closePreviewBtn.addEventListener('click', () => previewModal.classList.add('hidden'))
     previewModal.addEventListener('click', (e) => { if (e.target === previewModal) previewModal.classList.add('hidden') })
-    refreshBtn.addEventListener('click', loadStats)
+    refreshBtn.addEventListener('click', () => { if (filterActive) applyFilters(); else loadStats() })
     searchBtn.addEventListener('click', runSearch)
     clearSearchBtn.addEventListener('click', clearSearch)
     searchQueryInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch() })
+    applyFiltersBtn.addEventListener('click', applyFilters)
+    clearFiltersBtn.addEventListener('click', clearFilters)
     clearBtn.addEventListener('click', async () => {
       const base = getApiBase()
       if (!base) return
@@ -520,6 +647,7 @@
           showStatus('知识库已清空。', true)
           uploadQueue = []
           renderUploadQueue()
+          clearFilters(false)
           await loadStats()
           clearSearch()
           return

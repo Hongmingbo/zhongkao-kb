@@ -67,3 +67,43 @@ def test_api_daily_quote_has_required_fields():
     assert isinstance(data["text"], str) and data["text"]
     assert isinstance(data["source"], str) and data["source"]
     assert isinstance(data["summary"], str) and data["summary"]
+
+
+def test_filters_options(tmp_path: Path):
+    kb = tmp_path / "knowledge_base"
+    (kb / "语文").mkdir(parents=True)
+    (kb / "语文" / "a.md").write_text("x", encoding="utf-8")
+    (kb / "语文" / "a.md.meta.json").write_text('{"year":"2023","region":"北京","type":"中考真题"}', encoding="utf-8")
+    (kb / "数学").mkdir(parents=True)
+    (kb / "数学" / "b.txt").write_text("y", encoding="utf-8")
+
+    main.KNOWLEDGE_BASE_DIR = kb
+    client = TestClient(main.app)
+    r = client.get("/api/filters/options")
+    assert r.status_code == 200
+    data = r.json()
+    assert "语文" in data["categories"]
+    assert "数学" in data["categories"]
+    assert "2023" in data["years"]
+    assert "北京" in data["regions"]
+    assert "中考真题" in data["types"]
+    assert "md" in data["exts"]
+    assert "txt" in data["exts"]
+
+
+def test_filter_by_meta_and_ext(tmp_path: Path):
+    kb = tmp_path / "knowledge_base"
+    (kb / "语文").mkdir(parents=True)
+    (kb / "语文" / "a.md").write_text("x", encoding="utf-8")
+    (kb / "语文" / "a.md.meta.json").write_text('{"year":"2023","region":"北京","type":"中考真题"}', encoding="utf-8")
+    (kb / "语文" / "b.md").write_text("y", encoding="utf-8")
+    (kb / "数学").mkdir(parents=True)
+    (kb / "数学" / "c.txt").write_text("z", encoding="utf-8")
+
+    main.KNOWLEDGE_BASE_DIR = kb
+    client = TestClient(main.app)
+    r = client.get("/api/filter", params={"year": "2023", "ext": "md"})
+    assert r.status_code == 200
+    data = r.json()
+    assert "语文" in data
+    assert [x["name"] for x in data["语文"]] == ["a.md"]
