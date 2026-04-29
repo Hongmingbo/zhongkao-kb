@@ -13,7 +13,7 @@
   <div class="max-w-5xl mx-auto py-10 px-4">
     <header class="mb-8 text-center">
       <h1 class="text-4xl font-bold text-blue-600 mb-2">中考知识库</h1>
-      <p class="text-gray-500">Cloudflare Pages 前端 · Hugging Face Spaces 后端</p>
+      <div id="daily-quote" class="text-gray-500 text-sm"></div>
     </header>
 
     <main class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -111,9 +111,68 @@
     let uploadQueue = []
     let activeUploads = 0
     const API_BASE = 'https://hmingbo-zhongkao-kb-api.hf.space'
+    const QUOTE_CACHE_KEY = 'ZKKB_DAILY_QUOTE'
 
     function getApiBase() {
       return API_BASE
+    }
+
+    function escapeHtml(unsafe) {
+      return String(unsafe)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+    }
+
+    function escapeAttr(unsafe) {
+      return escapeHtml(unsafe).replace(/`/g, '&#096;')
+    }
+
+    function renderDailyQuote(data) {
+      const el = document.getElementById('daily-quote')
+      if (!el) return
+      const line = `${data.text}---${data.source}`
+      el.innerHTML = `
+        <details class="inline-block text-left">
+          <summary class="cursor-pointer select-none">${escapeHtml(line)}</summary>
+          <div class="mt-1 text-gray-600">${escapeHtml(data.summary)}</div>
+        </details>
+      `
+    }
+
+    async function loadDailyQuote() {
+      const fallback = {
+        date: '',
+        text: '不积跬步，无以至千里；不积小流，无以成江海。',
+        source: '《荀子·劝学》',
+        summary: '强调点滴积累与长期坚持，才能实现大的目标。'
+      }
+
+      try {
+        const cachedRaw = localStorage.getItem(QUOTE_CACHE_KEY)
+        const cached = cachedRaw ? JSON.parse(cachedRaw) : null
+        const now = new Date()
+        const today = new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' })
+          .formatToParts(now)
+          .reduce((acc, p) => (acc[p.type] = p.value, acc), {})
+        const todayStr = `${today.year}-${today.month}-${today.day}`
+        if (cached && cached.date === todayStr && cached.text && cached.source && cached.summary) {
+          renderDailyQuote(cached)
+          return
+        }
+
+        const r = await fetch(API_BASE + '/api/daily_quote')
+        const data = await r.json()
+        if (r.ok && data && data.text && data.source && data.summary) {
+          localStorage.setItem(QUOTE_CACHE_KEY, JSON.stringify(data))
+          renderDailyQuote(data)
+          return
+        }
+      } catch (e) {}
+
+      renderDailyQuote(fallback)
     }
 
     function showStatus(message, isSuccess) {
@@ -471,19 +530,7 @@
       }
     })
 
-    function escapeHtml(unsafe) {
-      return String(unsafe)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;')
-    }
-
-    function escapeAttr(unsafe) {
-      return escapeHtml(unsafe).replace(/`/g, '&#096;')
-    }
-
+    loadDailyQuote()
     loadStats()
   </script>
 </body>

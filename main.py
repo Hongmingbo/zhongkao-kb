@@ -5,12 +5,14 @@ import zipfile
 import tempfile
 import re
 import json
+import datetime as dt
 from typing import Optional
 from pathlib import Path
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from zoneinfo import ZoneInfo
 
 # Additional imports for new features
 try:
@@ -439,6 +441,59 @@ async def api_search(
         limit=limit,
         context=context,
     )
+
+@app.get("/api/daily_quote")
+async def get_daily_quote():
+    tz = ZoneInfo("Asia/Shanghai")
+    today = dt.datetime.now(tz=tz).date()
+    date_str = today.isoformat()
+
+    quotes = [
+        {
+            "text": "学而不思则罔，思而不学则殆。",
+            "source": "《论语·为政》",
+            "summary": "强调学习与思考要结合，才能真正掌握知识。",
+        },
+        {
+            "text": "不积跬步，无以至千里；不积小流，无以成江海。",
+            "source": "《荀子·劝学》",
+            "summary": "强调点滴积累与长期坚持，才能实现大的目标。",
+        },
+        {
+            "text": "纸上得来终觉浅，绝知此事要躬行。",
+            "source": "陆游《冬夜读书示子聿》",
+            "summary": "强调实践的重要性，知识要通过行动才能真正理解。",
+        },
+        {
+            "text": "千磨万击还坚劲，任尔东西南北风。",
+            "source": "郑燮《竹石》",
+            "summary": "强调意志坚定与抗压能力，在逆境中保持韧性。",
+        },
+        {
+            "text": "山重水复疑无路，柳暗花明又一村。",
+            "source": "陆游《游山西村》",
+            "summary": "强调遇到困难不要放弃，坚持下去往往会迎来转机。",
+        },
+        {
+            "text": "业精于勤，荒于嬉；行成于思，毁于随。",
+            "source": "韩愈《进学解》",
+            "summary": "强调勤奋与反思能成就学业，懒散随意会导致退步。",
+        },
+        {
+            "text": "天行健，君子以自强不息。",
+            "source": "《周易·乾》",
+            "summary": "强调自强与进取精神，把成长当作长期任务。",
+        },
+        {
+            "text": "沉舟侧畔千帆过，病树前头万木春。",
+            "source": "刘禹锡《酬乐天扬州初逢席上见赠》",
+            "summary": "强调更新与希望：旧的会过去，新的会不断出现。",
+        },
+    ]
+
+    idx = abs(hash(date_str)) % len(quotes)
+    q = quotes[idx]
+    return {"date": date_str, **q}
 
 @app.delete("/api/clear")
 async def clear_knowledge_base():

@@ -55,3 +55,15 @@ def test_root_redirects_to_pages():
     r = client.get("/")
     assert r.status_code in [301, 302, 307, 308]
     assert r.headers.get("location") == "https://zhongkao-kb.pages.dev/"
+
+
+def test_api_daily_quote_has_required_fields():
+    client = TestClient(main.app)
+    r = client.get("/api/daily_quote")
+    assert r.status_code == 200
+    data = r.json()
+    assert set(["date", "text", "source", "summary"]).issubset(set(data.keys()))
+    assert isinstance(data["date"], str) and data["date"]
+    assert isinstance(data["text"], str) and data["text"]
+    assert isinstance(data["source"], str) and data["source"]
+    assert isinstance(data["summary"], str) and data["summary"]
