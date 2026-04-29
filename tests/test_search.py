@@ -48,3 +48,10 @@ def test_api_search_returns_results(tmp_path: Path):
     data = r.json()
     assert data["query"] == "文言文"
     assert data["results"][0]["filename"] == "语文.md"
+
+
+def test_root_redirects_to_pages():
+    client = TestClient(main.app, follow_redirects=False)
+    r = client.get("/")
+    assert r.status_code in [301, 302, 307, 308]
+    assert r.headers.get("location") == "https://zhongkao-kb.pages.dev/"

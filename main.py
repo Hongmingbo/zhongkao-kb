@@ -8,7 +8,7 @@ import json
 from typing import Optional
 from pathlib import Path
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -369,12 +369,9 @@ def process_single_file(file_path: Path, original_filename: str) -> dict:
 
 # ----------------- API Endpoints ----------------- #
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
 async def get_index():
-    index_file = STATIC_DIR / "index.html"
-    if index_file.exists():
-        return index_file.read_text(encoding="utf-8")
-    return "<h1>前端页面未找到</h1>"
+    return RedirectResponse(url="https://zhongkao-kb.pages.dev/", status_code=302)
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):

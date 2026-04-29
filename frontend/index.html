@@ -16,21 +16,6 @@
       <p class="text-gray-500">Cloudflare Pages 前端 · Hugging Face Spaces 后端</p>
     </header>
 
-    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-6">
-      <div class="flex flex-col md:flex-row md:items-end gap-3">
-        <div class="flex-1">
-          <label class="block text-sm font-medium text-gray-700 mb-1">后端地址（HF Space）</label>
-          <input id="apiBase" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://hmingbo-zhongkao-kb-api.hf.space">
-          <div class="text-xs text-gray-500 mt-1">建议填写以 https:// 开头的 hf.space 域名</div>
-        </div>
-        <div class="flex gap-2">
-          <button id="saveApiBase" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">保存</button>
-          <button id="checkApi" class="px-4 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm hover:bg-gray-200">检查</button>
-        </div>
-      </div>
-      <div id="apiStatus" class="mt-3 text-sm"></div>
-    </div>
-
     <main class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <section class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <h2 class="text-xl font-semibold mb-4 flex items-center">
@@ -109,10 +94,6 @@
     const statusDiv = uploadStatus.querySelector('div')
     const uploadQueueEl = document.getElementById('upload-queue')
     const kbStats = document.getElementById('kb-stats')
-    const apiBaseInput = document.getElementById('apiBase')
-    const apiStatus = document.getElementById('apiStatus')
-    const saveApiBaseBtn = document.getElementById('saveApiBase')
-    const checkApiBtn = document.getElementById('checkApi')
     const refreshBtn = document.getElementById('refreshBtn')
     const clearBtn = document.getElementById('clearBtn')
     const searchQueryInput = document.getElementById('searchQuery')
@@ -129,42 +110,10 @@
     const UPLOAD_CONCURRENCY = 3
     let uploadQueue = []
     let activeUploads = 0
+    const API_BASE = 'https://hmingbo-zhongkao-kb-api.hf.space'
 
     function getApiBase() {
-      const v = (apiBaseInput.value || '').trim()
-      return v.replace(/\/+$/, '')
-    }
-
-    function loadApiBase() {
-      const saved = localStorage.getItem('ZKKB_API_BASE') || ''
-      const urlParam = new URLSearchParams(location.search).get('api') || ''
-      const defaultBase = 'https://hmingbo-zhongkao-kb-api.hf.space'
-      const v = (urlParam || saved || defaultBase).trim()
-      apiBaseInput.value = v
-      if (!saved && !urlParam && v) localStorage.setItem('ZKKB_API_BASE', v.replace(/\/+$/, ''))
-    }
-
-    function setApiStatus(text, ok) {
-      apiStatus.className = ok ? 'mt-3 text-sm text-green-700' : 'mt-3 text-sm text-red-700'
-      apiStatus.textContent = text
-    }
-
-    async function checkApi() {
-      const base = getApiBase()
-      if (!base) {
-        setApiStatus('请先填写后端地址。', false)
-        return
-      }
-      try {
-        const r = await fetch(base + '/api/stats', { method: 'GET' })
-        if (r.ok) {
-          setApiStatus('后端连接正常。', true)
-        } else {
-          setApiStatus('后端可达，但返回异常状态码：' + r.status, false)
-        }
-      } catch (e) {
-        setApiStatus('无法连接后端：' + (e && e.message ? e.message : String(e)), false)
-      }
+      return API_BASE
     }
 
     function showStatus(message, isSuccess) {
@@ -241,7 +190,7 @@
     function enqueueFiles(files) {
       const base = getApiBase()
       if (!base) {
-        showStatus('请先在页面顶部填写并保存后端地址。', false)
+        showStatus('后端地址不可用。', false)
         return
       }
 
@@ -497,14 +446,6 @@
 
     closePreviewBtn.addEventListener('click', () => previewModal.classList.add('hidden'))
     previewModal.addEventListener('click', (e) => { if (e.target === previewModal) previewModal.classList.add('hidden') })
-    saveApiBaseBtn.addEventListener('click', () => {
-      const base = getApiBase()
-      if (!base) { setApiStatus('后端地址不能为空。', false); return }
-      localStorage.setItem('ZKKB_API_BASE', base)
-      setApiStatus('已保存后端地址。', true)
-      loadStats()
-    })
-    checkApiBtn.addEventListener('click', checkApi)
     refreshBtn.addEventListener('click', loadStats)
     searchBtn.addEventListener('click', runSearch)
     clearSearchBtn.addEventListener('click', clearSearch)
@@ -543,7 +484,6 @@
       return escapeHtml(unsafe).replace(/`/g, '&#096;')
     }
 
-    loadApiBase()
     loadStats()
   </script>
 </body>
