@@ -107,3 +107,55 @@ def test_filter_by_meta_and_ext(tmp_path: Path):
     data = r.json()
     assert "语文" in data
     assert [x["name"] for x in data["语文"]] == ["a.md"]
+
+
+def test_split_questions_basic():
+    from main import split_questions_from_text
+
+    text = """一、选择题
+1. 下列说法正确的是（ ）
+A. 选项A
+B. 选项B
+C. 选项C
+D. 选项D
+
+2、这是一道没有选项的题
+"""
+
+    items = split_questions_from_text(text)
+    assert len(items) == 2
+    assert items[0]["id"] == "1"
+    assert "下列说法正确的是" in items[0]["stem"]
+    assert items[0]["options"][0].startswith("A")
+    assert items[1]["id"] == "2"
+    assert items[1]["options"] == []
+
+
+def test_api_split_creates_questions_file(tmp_path: Path):
+    kb = tmp_path / "knowledge_base"
+    (kb / "语文").mkdir(parents=True)
+    (kb / "语文" / "试卷.md").write_text(
+        """1. 题目
+A. a
+B. b
+C. c
+D. d
+""",
+        encoding="utf-8",
+    )
+
+    main.KNOWLEDGE_BASE_DIR = kb
+    client = TestClient(main.app)
+    r = client.post("/api/split", json={"category": "语文", "filename": "试卷.md"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["status"] == "success"
+    assert data["count"] == 1
+
+    out = kb / "语文" / "试卷.questions.json"
+    assert out.exists()
+
+    r2 = client.get("/api/questions/语文/试卷.questions.json")
+    assert r2.status_code == 200
+    data2 = r2.json()
+    assert data2["items"][0]["id"] == "1"

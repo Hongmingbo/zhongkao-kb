@@ -8,7 +8,7 @@ import json
 import datetime as dt
 from typing import Optional
 from pathlib import Path
-from fastapi import FastAPI, File, UploadFile, HTTPException, Query
+from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Body
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -166,6 +166,74 @@ def search_knowledge_base(
         "context": context,
         "results": results[:limit],
     }
+
+def split_questions_from_text(text: str):
+    if not text:
+        return []
+
+    t = text.replace("\r\n", "\n").replace("\r", "\n")
+    lines = t.split("\n")
+
+    q_start = re.compile(r"^\s*(?:\((\d{1,3})\)|（(\d{1,3})）|(\d{1,3})[\.、\)])\s*(.*)$")
+    opt_line = re.compile(r"^\s*([A-DＡ-Ｄ])[\.．、\)]?\s*(.*)$")
+    fw_to_hw = str.maketrans("ＡＢＣＤ", "ABCD")
+
+    blocks = []
+    current = None
+    current_id = None
+
+    for raw in lines:
+        m = q_start.match(raw)
+        if m:
+            if current is not None:
+                blocks.append((current_id, current))
+            current_id = m.group(1) or m.group(2) or m.group(3) or ""
+            rest = m.group(4) or ""
+            current = [rest.strip()] if rest.strip() else []
+            continue
+        if current is None:
+            continue
+        current.append(raw.rstrip())
+
+    if current is not None:
+        blocks.append((current_id, current))
+
+    items = []
+    for qid, b in blocks:
+        stem_lines = []
+        options = []
+
+        for line in b:
+            s = (line or "").strip()
+            if not s:
+                if stem_lines and stem_lines[-1] != "":
+                    stem_lines.append("")
+                continue
+
+            m = opt_line.match(s)
+            if m:
+                letter = (m.group(1) or "").translate(fw_to_hw)
+                letter = letter.upper()
+                if letter in ["A", "B", "C", "D"]:
+                    body = (m.group(2) or "").strip()
+                    options.append(f"{letter}. {body}".strip())
+                    continue
+
+            stem_lines.append(s)
+
+        stem = "\n".join([x for x in stem_lines]).strip()
+        items.append(
+            {
+                "id": str(qid),
+                "stem": stem,
+                "options": options,
+                "answer": "",
+                "analysis": "",
+                "tags": [],
+            }
+        )
+
+    return items
 
 def get_file_md5(file_path: Path) -> str:
     hash_md5 = hashlib.md5()
@@ -581,6 +649,54 @@ async def filter_files(
             del stats[cat]
 
     return stats
+
+@app.post("/api/split")
+async def split_file(payload: dict = Body(...)):
+    category = (payload.get("category") or "").strip()
+    filename = (payload.get("filename") or "").strip()
+    if not category or not filename:
+        raise HTTPException(status_code=400, detail="缺少 category 或 filename")
+
+    file_path = KNOWLEDGE_BASE_DIR / category / filename
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    ext = file_path.suffix.lower()
+    if ext not in [".md", ".txt", ".csv"]:
+        raise HTTPException(status_code=400, detail="仅支持对 .md/.txt/.csv 拆题")
+
+    text = file_path.read_text(encoding="utf-8", errors="ignore")
+    items = split_questions_from_text(text)
+
+    tz = ZoneInfo("Asia/Shanghai")
+    generated_at = dt.datetime.now(tz=tz).isoformat()
+    out_filename = f"{file_path.stem}.questions.json"
+    out_path = file_path.with_name(out_filename)
+    out_obj = {
+        "version": 1,
+        "source": {"category": category, "filename": filename, "generated_at": generated_at},
+        "items": items,
+    }
+    out_path.write_text(json.dumps(out_obj, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    return {
+        "status": "success",
+        "source": {"category": category, "filename": filename},
+        "output": {"filename": out_filename, "path": f"knowledge_base/{category}/{out_filename}"},
+        "count": len(items),
+    }
+
+@app.get("/api/questions/{category}/{filename}")
+async def get_questions(category: str, filename: str):
+    file_path = KNOWLEDGE_BASE_DIR / category / filename
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="文件不存在")
+    if not filename.endswith(".questions.json"):
+        raise HTTPException(status_code=400, detail="仅支持读取 *.questions.json")
+    try:
+        return json.loads(file_path.read_text(encoding="utf-8", errors="ignore") or "{}")
+    except Exception:
+        raise HTTPException(status_code=500, detail="JSON 解析失败")
 
 @app.delete("/api/clear")
 async def clear_knowledge_base():

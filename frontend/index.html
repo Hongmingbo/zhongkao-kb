@@ -376,7 +376,11 @@
                 ${escapeHtml(category)} <span class="ml-2 text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">${files.length}</span>
               </h3>
               <ul class="pl-5 border-l-2 border-gray-100 ml-2 space-y-2">
-                ${files.map(f => `
+                ${files.map(f => {
+                  const n = String(f.name || '')
+                  const lower = n.toLowerCase()
+                  const canSplit = !lower.endsWith('.questions.json') && (lower.endsWith('.md') || lower.endsWith('.txt') || lower.endsWith('.csv'))
+                  return `
                   <li class="text-sm text-gray-600 flex items-center justify-between group">
                     <div class="flex items-center before:content-[''] before:w-2 before:h-[1px] before:bg-gray-300 before:mr-2 before:-ml-5">
                       <span class="truncate max-w-[220px]" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
@@ -384,10 +388,12 @@
                     </div>
                     <div class="hidden group-hover:flex space-x-2">
                       <button class="text-blue-500 hover:text-blue-700 text-xs" data-action="preview" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">预览</button>
+                      ${canSplit ? `<button class="text-indigo-500 hover:text-indigo-700 text-xs" data-action="split" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">拆题</button>` : ''}
                       <button class="text-red-500 hover:text-red-700 text-xs" data-action="delete" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">删除</button>
                     </div>
                   </li>
-                `).join('')}
+                `
+                }).join('')}
               </ul>
             </div>
           `
@@ -482,7 +488,11 @@
               ${escapeHtml(category)} <span class="ml-2 text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">${files.length}</span>
             </h3>
             <ul class="pl-5 border-l-2 border-gray-100 ml-2 space-y-2">
-              ${files.map(f => `
+              ${files.map(f => {
+                const n = String(f.name || '')
+                const lower = n.toLowerCase()
+                const canSplit = !lower.endsWith('.questions.json') && (lower.endsWith('.md') || lower.endsWith('.txt') || lower.endsWith('.csv'))
+                return `
                 <li class="text-sm text-gray-600 flex items-center justify-between group">
                   <div class="flex items-center before:content-[''] before:w-2 before:h-[1px] before:bg-gray-300 before:mr-2 before:-ml-5">
                     <span class="truncate max-w-[220px]" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
@@ -490,10 +500,12 @@
                   </div>
                   <div class="hidden group-hover:flex space-x-2">
                     <button class="text-blue-500 hover:text-blue-700 text-xs" data-action="preview" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">预览</button>
+                    ${canSplit ? `<button class="text-indigo-500 hover:text-indigo-700 text-xs" data-action="split" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">拆题</button>` : ''}
                     <button class="text-red-500 hover:text-red-700 text-xs" data-action="delete" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">删除</button>
                   </div>
                 </li>
-              `).join('')}
+              `
+              }).join('')}
             </ul>
           </div>
         `
@@ -576,6 +588,7 @@
       const filename = btn.getAttribute('data-filename')
       if (!action || !category || !filename) return
       if (action === 'preview') await previewFile(category, filename)
+      if (action === 'split') await splitFile(category, filename)
       if (action === 'delete') await deleteFile(category, filename)
     })
 
@@ -607,6 +620,65 @@
         previewModal.classList.remove('hidden')
       } catch (e) {
         alert('预览失败: ' + (e && e.message ? e.message : String(e)))
+      }
+    }
+
+    async function splitFile(category, filename) {
+      const base = getApiBase()
+      try {
+        const r = await fetch(base + '/api/split', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category, filename }),
+        })
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok || data.status !== 'success') {
+          alert('拆题失败: ' + escapeHtml((data && (data.detail || data.message)) || String(r.status)))
+          return
+        }
+
+        const outName = data && data.output ? data.output.filename : ''
+        if (outName) {
+          if (filterActive) await applyFilters()
+          else await loadStats()
+        }
+
+        const qUrl = base + '/api/questions/' + encodeURIComponent(category) + '/' + encodeURIComponent(outName)
+        const r2 = await fetch(qUrl)
+        const qData = await r2.json().catch(() => ({}))
+        if (!r2.ok) {
+          alert('获取拆题结果失败: ' + escapeHtml((qData && qData.detail) || String(r2.status)))
+          return
+        }
+
+        const items = Array.isArray(qData.items) ? qData.items : []
+        const showItems = items.slice(0, 10).map(it => {
+          const opts = Array.isArray(it.options) ? it.options : []
+          const optHtml = opts.length
+            ? `<ul class="mt-2 list-disc pl-5 space-y-1">${opts.map(o => `<li>${escapeHtml(o)}</li>`).join('')}</ul>`
+            : ''
+          return `
+            <div class="p-3 rounded-lg border border-gray-200 bg-white">
+              <div class="text-sm font-semibold text-gray-800">第 ${escapeHtml(it.id || '')} 题</div>
+              <div class="mt-2 text-sm text-gray-700 whitespace-pre-wrap">${escapeHtml(it.stem || '')}</div>
+              ${optHtml}
+            </div>
+          `
+        }).join('')
+
+        const blob = new Blob([JSON.stringify(qData, null, 2)], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        modalTitle.textContent = `拆题结果：${filename}`
+        modalContent.innerHTML = `
+          <div class="mb-4 flex items-center justify-between gap-2">
+            <div class="text-sm text-gray-600">共 ${items.length} 题（预览前 10 题）</div>
+            <a class="text-sm text-blue-600 hover:text-blue-800" href="${url}" download="${escapeAttr(outName || 'questions.json')}">下载 JSON</a>
+          </div>
+          <div class="space-y-3">${showItems || '<p class="text-sm text-gray-500">未识别到题目。</p>'}</div>
+        `
+        previewModal.classList.remove('hidden')
+      } catch (e) {
+        alert('拆题失败: ' + (e && e.message ? e.message : String(e)))
       }
     }
 
