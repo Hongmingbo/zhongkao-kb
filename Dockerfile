@@ -2,6 +2,7 @@ FROM python:3.11-slim
 
 # Install system dependencies (for OCR, etc. if needed in the future)
 RUN apt-get update && apt-get install -y \
+    poppler-utils \
     tesseract-ocr \
     tesseract-ocr-chi-sim \
     && rm -rf /var/lib/apt/lists/*

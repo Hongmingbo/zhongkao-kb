@@ -29,6 +29,11 @@ except ImportError:
     pytesseract = None
     Image = None
 
+try:
+    from pdf2image import convert_from_path
+except ImportError:
+    convert_from_path = None
+
 app = FastAPI(title="中考知识库 (Zhongkao Knowledge Base)")
 
 app.add_middleware(
@@ -130,9 +135,25 @@ def extract_text_from_file(file_path: Path) -> str:
         try:
             with open(file_path, "rb") as f:
                 reader = PyPDF2.PdfReader(f)
-                text = "\n".join(page.extract_text() for page in reader.pages if page.extract_text())
+                parts = []
+                for page in reader.pages:
+                    t = page.extract_text()
+                    if t:
+                        parts.append(t)
+                text = "\n".join(parts)
         except Exception:
             pass
+        if not text.strip() and convert_from_path and pytesseract and Image:
+            try:
+                images = convert_from_path(str(file_path), dpi=220, fmt="png")
+                ocr_parts = []
+                for idx, img in enumerate(images, start=1):
+                    t = pytesseract.image_to_string(img, lang="chi_sim+eng")
+                    if t and t.strip():
+                        ocr_parts.append(f"第{idx}页\n{t.strip()}")
+                text = "\n\n".join(ocr_parts)
+            except Exception:
+                text = ""
     elif ext in ['.docx', '.doc'] and docx:
         try:
             doc = docx.Document(file_path)
@@ -157,7 +178,7 @@ def extract_text_from_file(file_path: Path) -> str:
 
 def placeholder_for(ext: str) -> str:
     if ext == ".pdf":
-        return "【未提取到有效文本：该 PDF 可能是扫描件/图片型 PDF，当前未启用 PDF-OCR】"
+        return "【未提取到有效文本：该 PDF 可能是扫描件/图片型 PDF，且 OCR 失败或依赖未安装】"
     if ext in [".doc", ".docx"]:
         return "【未提取到有效文本：Word 文档解析失败】"
     if ext in [".jpg", ".jpeg", ".png"]:
