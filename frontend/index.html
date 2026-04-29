@@ -47,8 +47,10 @@
             <p class="pl-1">或拖拽文件到这里</p>
           </div>
           <p class="text-xs text-gray-500 mt-2">支持 txt, md, pdf, docx, jpg, zip 批量上传等</p>
-          <input id="file-upload" name="file-upload" type="file" class="absolute inset-0 opacity-0 cursor-pointer">
+          <input id="file-upload" name="file-upload" type="file" multiple class="absolute inset-0 opacity-0 cursor-pointer">
         </div>
+
+        <div id="upload-queue" class="mt-4 hidden"></div>
 
         <div id="upload-status" class="mt-4 hidden">
           <div class="p-4 rounded-md"></div>
@@ -105,6 +107,7 @@
     const fileInput = document.getElementById('file-upload')
     const uploadStatus = document.getElementById('upload-status')
     const statusDiv = uploadStatus.querySelector('div')
+    const uploadQueueEl = document.getElementById('upload-queue')
     const kbStats = document.getElementById('kb-stats')
     const apiBaseInput = document.getElementById('apiBase')
     const apiStatus = document.getElementById('apiStatus')
@@ -121,6 +124,11 @@
     const modalTitle = document.getElementById('modal-title')
     const modalContent = document.getElementById('modal-content')
     const closePreviewBtn = document.getElementById('closePreview')
+
+    const MAX_BATCH_FILES = 50
+    const UPLOAD_CONCURRENCY = 3
+    let uploadQueue = []
+    let activeUploads = 0
 
     function getApiBase() {
       const v = (apiBaseInput.value || '').trim()
@@ -172,11 +180,11 @@
 
     dropZone.addEventListener('drop', (e) => {
       const files = e.dataTransfer.files
-      if (files && files.length) uploadFile(files[0])
+      if (files && files.length) enqueueFiles(Array.from(files))
     }, false)
 
     fileInput.addEventListener('change', function() {
-      if (this.files && this.files.length) uploadFile(this.files[0])
+      if (this.files && this.files.length) enqueueFiles(Array.from(this.files))
       this.value = ''
     })
 
@@ -184,39 +192,124 @@
       if (e.target !== fileInput && !e.target.closest('label')) fileInput.click()
     })
 
-    async function uploadFile(file) {
+    function newQueueItem(file) {
+      const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`
+      return { id, file, name: file.name, status: 'queued', category: '', message: '' }
+    }
+
+    function renderUploadQueue() {
+      if (!uploadQueue.length) {
+        uploadQueueEl.classList.add('hidden')
+        uploadQueueEl.innerHTML = ''
+        return
+      }
+
+      uploadQueueEl.classList.remove('hidden')
+
+      const badge = (status) => {
+        if (status === 'queued') return '<span class="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded border border-gray-200">等待</span>'
+        if (status === 'uploading') return '<span class="px-2 py-0.5 text-xs bg-blue-50 text-blue-700 rounded border border-blue-100">上传中</span>'
+        if (status === 'success') return '<span class="px-2 py-0.5 text-xs bg-green-50 text-green-700 rounded border border-green-200">成功</span>'
+        return '<span class="px-2 py-0.5 text-xs bg-red-50 text-red-700 rounded border border-red-200">失败</span>'
+      }
+
+      const rows = uploadQueue.map(item => {
+        const right = item.status === 'success' && item.category
+          ? `<span class="ml-2 px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded">${escapeHtml(item.category)}</span>`
+          : item.status === 'error' && item.message
+            ? `<span class="ml-2 text-xs text-red-600 break-words">${escapeHtml(item.message)}</span>`
+            : ''
+
+        return `
+          <div class="flex items-start justify-between gap-2 py-2 border-b border-gray-100 last:border-b-0">
+            <div class="min-w-0">
+              <div class="text-sm text-gray-800 truncate" title="${escapeAttr(item.name)}">${escapeHtml(item.name)}</div>
+              <div class="mt-1 flex items-center gap-2">${badge(item.status)}${right}</div>
+            </div>
+          </div>
+        `
+      }).join('')
+
+      uploadQueueEl.innerHTML = `
+        <div class="rounded-lg border border-gray-100 bg-white">
+          <div class="px-3 py-2 border-b border-gray-100 text-sm font-medium text-gray-700">批量上传队列</div>
+          <div class="px-3">${rows}</div>
+        </div>
+      `
+    }
+
+    function enqueueFiles(files) {
       const base = getApiBase()
       if (!base) {
         showStatus('请先在页面顶部填写并保存后端地址。', false)
         return
       }
 
-      showStatus(`正在上传: ${file.name}...`, true)
-      statusDiv.classList.replace('bg-green-50', 'bg-blue-50')
-      statusDiv.classList.replace('text-green-800', 'text-blue-800')
+      const currentCount = uploadQueue.length
+      const remaining = Math.max(0, MAX_BATCH_FILES - currentCount)
+      const picked = files.slice(0, remaining)
+      if (files.length > picked.length) {
+        showStatus(`本次最多加入 ${MAX_BATCH_FILES} 个文件，已忽略多余的 ${files.length - picked.length} 个。`, false)
+      }
+
+      if (!picked.length) return
+
+      uploadQueue = uploadQueue.concat(picked.map(newQueueItem))
+      renderUploadQueue()
+      pumpQueue()
+    }
+
+    async function uploadOne(item) {
+      const base = getApiBase()
+      if (!base) {
+        item.status = 'error'
+        item.message = '后端地址为空'
+        renderUploadQueue()
+        return
+      }
+
+      item.status = 'uploading'
+      item.message = ''
+      item.category = ''
+      activeUploads += 1
+      renderUploadQueue()
 
       const formData = new FormData()
-      formData.append('file', file)
+      formData.append('file', item.file)
 
       try {
         const response = await fetch(base + '/upload', { method: 'POST', body: formData })
         const data = await response.json().catch(() => ({}))
         if (response.ok && data.status === 'success') {
-          let msg = `<b>上传成功！</b><br>`
-          ;(data.results || []).forEach(res => {
-            if (res.status === 'success') {
-              msg += `文件：${escapeHtml(res.filename)} ➔ <span class="inline-block px-2 py-1 mt-1 text-xs font-semibold bg-green-100 text-green-800 rounded">${escapeHtml(res.category || '')}</span><br>`
-            } else {
-              msg += `文件：${escapeHtml(res.filename)} (跳过: ${escapeHtml(res.message || '')})<br>`
-            }
-          })
-          showStatus(msg, true)
-          await loadStats()
+          const first = (data.results || [])[0] || {}
+          item.status = 'success'
+          item.category = first.category || (first.status === 'success' ? '' : '')
         } else {
-          showStatus('上传失败: ' + escapeHtml(data.message || String(response.status)), false)
+          item.status = 'error'
+          item.message = data.message || String(response.status)
         }
       } catch (error) {
-        showStatus('网络错误: ' + escapeHtml(error && error.message ? error.message : String(error)), false)
+        item.status = 'error'
+        item.message = error && error.message ? error.message : String(error)
+      } finally {
+        activeUploads = Math.max(0, activeUploads - 1)
+        renderUploadQueue()
+        pumpQueue()
+
+        const hasQueued = uploadQueue.some(x => x.status === 'queued')
+        const hasUploading = activeUploads > 0
+        if (!hasQueued && !hasUploading) {
+          showStatus('批量上传已完成。', true)
+          await loadStats()
+        }
+      }
+    }
+
+    function pumpQueue() {
+      while (activeUploads < UPLOAD_CONCURRENCY) {
+        const next = uploadQueue.find(x => x.status === 'queued')
+        if (!next) break
+        void uploadOne(next)
       }
     }
 
@@ -425,6 +518,8 @@
         const data = await r.json().catch(() => ({}))
         if (r.ok && data.status === 'success') {
           showStatus('知识库已清空。', true)
+          uploadQueue = []
+          renderUploadQueue()
           await loadStats()
           clearSearch()
           return
