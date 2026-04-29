@@ -5,8 +5,9 @@ import zipfile
 import tempfile
 import re
 import json
+from typing import Optional
 from pathlib import Path
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -77,6 +78,92 @@ SUBJECT_KEYWORDS = {
 }
 
 # ----------------- Helper Functions ----------------- #
+
+def _iter_target_files(base_dir: Path, category: Optional[str]):
+    if category:
+        dirs = [base_dir / category]
+    else:
+        dirs = [p for p in base_dir.iterdir() if p.is_dir()]
+    for d in dirs:
+        if not d.exists() or not d.is_dir():
+            continue
+        for f in d.iterdir():
+            if not f.is_file():
+                continue
+            if f.name.endswith(".meta.json"):
+                continue
+            yield d.name, f
+
+def _find_all(haystack: str, needle: str, max_hits: int):
+    hits = []
+    start = 0
+    while start < len(haystack) and len(hits) < max_hits:
+        idx = haystack.find(needle, start)
+        if idx < 0:
+            break
+        hits.append(idx)
+        start = idx + max(1, len(needle))
+    return hits
+
+def _make_snippet(text: str, pos: int, needle_len: int, context: int) -> str:
+    left = max(0, pos - context)
+    right = min(len(text), pos + needle_len + context)
+    prefix = "…" if left > 0 else ""
+    suffix = "…" if right < len(text) else ""
+    return prefix + text[left:right].replace("\n", " ") + suffix
+
+def search_knowledge_base(
+    base_dir: Path,
+    q: str,
+    category: Optional[str],
+    limit: int,
+    context: int,
+):
+    q_norm = q.strip()
+    q_lower = q_norm.lower()
+    results = []
+    for cat, f in _iter_target_files(base_dir, category):
+        matches = []
+        filename_lower = f.name.lower()
+        if q_lower in filename_lower:
+            matches.append({"where": "filename", "snippet": f.name, "pos": filename_lower.find(q_lower)})
+
+        ext = f.suffix.lower()
+        if ext in [".md", ".txt", ".csv"]:
+            try:
+                content = f.read_text(encoding="utf-8", errors="ignore")
+            except Exception:
+                content = ""
+            content_lower = content.lower()
+            if q_lower in content_lower:
+                for pos in _find_all(content_lower, q_lower, max_hits=3):
+                    matches.append(
+                        {
+                            "where": "content",
+                            "snippet": _make_snippet(content, pos, len(q_norm), context),
+                            "pos": pos,
+                        }
+                    )
+
+        if matches:
+            results.append(
+                {
+                    "category": cat,
+                    "filename": f.name,
+                    "path": f"knowledge_base/{cat}/{f.name}",
+                    "count": len(matches),
+                    "matches": matches,
+                }
+            )
+
+    results.sort(key=lambda r: (-r["count"], r["filename"]))
+    return {
+        "query": q_norm,
+        "category": category,
+        "limit": limit,
+        "context": context,
+        "results": results[:limit],
+    }
 
 def get_file_md5(file_path: Path) -> str:
     hash_md5 = hashlib.md5()
@@ -340,6 +427,21 @@ async def get_stats():
             if files:
                 stats[item.name] = files
     return stats
+
+@app.get("/api/search")
+async def api_search(
+    q: str = Query(..., min_length=1, max_length=60),
+    category: Optional[str] = Query(None),
+    limit: int = Query(20, ge=1, le=50),
+    context: int = Query(60, ge=10, le=200),
+):
+    return search_knowledge_base(
+        base_dir=KNOWLEDGE_BASE_DIR,
+        q=q,
+        category=category,
+        limit=limit,
+        context=context,
+    )
 
 @app.delete("/api/clear")
 async def clear_knowledge_base():

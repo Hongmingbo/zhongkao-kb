@@ -60,6 +60,17 @@
           <svg class="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
           知识库结构
         </h2>
+        <div class="flex flex-col sm:flex-row gap-2 mb-4">
+          <input id="searchQuery" class="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="全文搜索（例如：文言文 / 二次函数）">
+          <select id="searchCategory" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="">全部学科</option>
+          </select>
+          <div class="flex gap-2">
+            <button id="searchBtn" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">搜索</button>
+            <button id="clearSearchBtn" class="px-4 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm hover:bg-gray-200">清除</button>
+          </div>
+        </div>
+        <div id="search-results" class="hidden mb-4"></div>
         <div id="kb-stats" class="space-y-4 max-h-[420px] overflow-y-auto">
           <p class="text-gray-500 text-sm">加载中...</p>
         </div>
@@ -101,6 +112,11 @@
     const checkApiBtn = document.getElementById('checkApi')
     const refreshBtn = document.getElementById('refreshBtn')
     const clearBtn = document.getElementById('clearBtn')
+    const searchQueryInput = document.getElementById('searchQuery')
+    const searchCategorySelect = document.getElementById('searchCategory')
+    const searchBtn = document.getElementById('searchBtn')
+    const clearSearchBtn = document.getElementById('clearSearchBtn')
+    const searchResults = document.getElementById('search-results')
     const previewModal = document.getElementById('preview-modal')
     const modalTitle = document.getElementById('modal-title')
     const modalContent = document.getElementById('modal-content')
@@ -213,6 +229,7 @@
       try {
         const response = await fetch(base + '/api/stats')
         const data = await response.json()
+        updateSearchCategories(data)
         if (!data || Object.keys(data).length === 0) {
           kbStats.innerHTML = '<p class="text-gray-500 text-sm text-center py-8">知识库还是空的，快去上传文件吧！</p>'
           return
@@ -248,6 +265,84 @@
       }
     }
 
+    function updateSearchCategories(data) {
+      const current = searchCategorySelect.value || ''
+      const keys = data && typeof data === 'object' ? Object.keys(data) : []
+      const options = ['<option value="">全部学科</option>']
+      keys.sort().forEach(k => {
+        options.push(`<option value="${escapeAttr(k)}">${escapeHtml(k)}</option>`)
+      })
+      searchCategorySelect.innerHTML = options.join('')
+      searchCategorySelect.value = current
+    }
+
+    async function runSearch() {
+      const base = getApiBase()
+      if (!base) return
+      const q = (searchQueryInput.value || '').trim()
+      if (!q) {
+        clearSearch()
+        return
+      }
+      const category = (searchCategorySelect.value || '').trim()
+      const params = new URLSearchParams({ q })
+      if (category) params.set('category', category)
+      try {
+        const r = await fetch(base + '/api/search?' + params.toString())
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok) {
+          searchResults.classList.remove('hidden')
+          searchResults.innerHTML = `<p class="text-sm text-red-600">搜索失败: ${escapeHtml((data && data.message) || String(r.status))}</p>`
+          return
+        }
+        renderSearchResults(data)
+      } catch (e) {
+        searchResults.classList.remove('hidden')
+        searchResults.innerHTML = `<p class="text-sm text-red-600">搜索失败: ${escapeHtml(e && e.message ? e.message : String(e))}</p>`
+      }
+    }
+
+    function clearSearch() {
+      searchQueryInput.value = ''
+      searchResults.classList.add('hidden')
+      searchResults.innerHTML = ''
+      kbStats.classList.remove('hidden')
+    }
+
+    function renderSearchResults(data) {
+      const results = (data && data.results) || []
+      searchResults.classList.remove('hidden')
+      if (!results.length) {
+        searchResults.innerHTML = '<p class="text-sm text-gray-500">未找到匹配结果。</p>'
+        kbStats.classList.add('hidden')
+        return
+      }
+      kbStats.classList.add('hidden')
+      const items = results.map(r => {
+        const matches = (r.matches || []).map(m => {
+          const badge = m.where === 'filename'
+            ? '<span class="px-1.5 py-0.5 text-[10px] bg-gray-100 text-gray-600 rounded border border-gray-200">文件名</span>'
+            : '<span class="px-1.5 py-0.5 text-[10px] bg-blue-50 text-blue-600 rounded border border-blue-100">内容</span>'
+          return `<div class="flex items-start gap-2 mt-1">${badge}<div class="text-xs text-gray-600 break-words">${escapeHtml(m.snippet || '')}</div></div>`
+        }).join('')
+        return `
+          <div class="p-3 rounded-lg border border-gray-100 bg-white">
+            <div class="flex items-center justify-between gap-2">
+              <div class="text-sm text-gray-800">
+                <span class="font-medium">${escapeHtml(r.category || '')}</span>
+                <span class="text-gray-400 mx-1">/</span>
+                <span>${escapeHtml(r.filename || '')}</span>
+                <span class="ml-2 text-xs text-gray-400">命中 ${r.count || 0}</span>
+              </div>
+              <button class="text-blue-600 hover:text-blue-800 text-xs" data-action="preview" data-category="${escapeAttr(r.category || '')}" data-filename="${escapeAttr(r.filename || '')}">预览</button>
+            </div>
+            ${matches}
+          </div>
+        `
+      }).join('')
+      searchResults.innerHTML = `<div class="space-y-2">${items}</div>`
+    }
+
     kbStats.addEventListener('click', async (e) => {
       const btn = e.target.closest('button')
       if (!btn) return
@@ -257,6 +352,15 @@
       if (!action || !category || !filename) return
       if (action === 'preview') await previewFile(category, filename)
       if (action === 'delete') await deleteFile(category, filename)
+    })
+
+    searchResults.addEventListener('click', async (e) => {
+      const btn = e.target.closest('button')
+      if (!btn) return
+      const action = btn.getAttribute('data-action')
+      const category = btn.getAttribute('data-category')
+      const filename = btn.getAttribute('data-filename')
+      if (action === 'preview' && category && filename) await previewFile(category, filename)
     })
 
     async function previewFile(category, filename) {
@@ -309,6 +413,9 @@
     })
     checkApiBtn.addEventListener('click', checkApi)
     refreshBtn.addEventListener('click', loadStats)
+    searchBtn.addEventListener('click', runSearch)
+    clearSearchBtn.addEventListener('click', clearSearch)
+    searchQueryInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch() })
     clearBtn.addEventListener('click', async () => {
       const base = getApiBase()
       if (!base) return
@@ -319,6 +426,7 @@
         if (r.ok && data.status === 'success') {
           showStatus('知识库已清空。', true)
           await loadStats()
+          clearSearch()
           return
         }
         showStatus('清空失败: ' + escapeHtml(data.message || String(r.status)), false)
