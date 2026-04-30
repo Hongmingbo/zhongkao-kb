@@ -68,6 +68,42 @@ def _pbkdf2(password: str, salt: str, rounds: int = 200_000) -> str:
     dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), rounds)
     return dk.hex()
 
+def update_password_by_user_id(user_id: int, new_password: str):
+    init_db()
+    salt = secrets.token_hex(16)
+    pw_hash = _pbkdf2(new_password, salt)
+    conn = get_conn()
+    try:
+        conn.execute(
+            "UPDATE users SET password_salt=?, password_hash=? WHERE id=?",
+            (salt, pw_hash, user_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def delete_sessions_by_user_id(user_id: int):
+    init_db()
+    conn = get_conn()
+    try:
+        conn.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_user_by_username(username: str) -> Optional[User]:
+    init_db()
+    conn = get_conn()
+    try:
+        row = conn.execute("SELECT id, username FROM users WHERE username=?", (username,)).fetchone()
+        if not row:
+            return None
+        return User(id=int(row["id"]), username=row["username"])
+    finally:
+        conn.close()
+
 
 def create_user(username: str, password: str) -> User:
     init_db()

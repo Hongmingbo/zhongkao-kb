@@ -546,6 +546,21 @@ async def set_profile_nickname(
     return {"status": "success", "nickname": nickname}
 
 
+@app.post("/api/profile/password")
+async def change_password(payload: dict = Body(...), current_user: auth.User = Depends(auth.get_current_user)):
+    old_password = payload.get("old_password") or ""
+    new_password = payload.get("new_password") or ""
+    if not old_password or not new_password:
+        raise HTTPException(status_code=400, detail="缺少 old_password 或 new_password")
+    if len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="新密码长度至少 6 位")
+    if not auth.verify_user(current_user.username, old_password):
+        raise HTTPException(status_code=401, detail="旧密码错误")
+    auth.update_password_by_user_id(current_user.id, new_password)
+    auth.delete_sessions_by_user_id(current_user.id)
+    return {"status": "success"}
+
+
 @app.post("/api/profile/avatar")
 async def upload_profile_avatar(
     file: UploadFile = File(...),
@@ -593,6 +608,22 @@ async def get_profile_avatar(current_user: auth.User = Depends(auth.get_current_
 @app.get("/api/admin/users_count")
 async def admin_users_count(_: None = Depends(require_admin)):
     return {"user_count": auth.get_users_count()}
+
+
+@app.post("/api/admin/reset_password")
+async def admin_reset_password(payload: dict = Body(...), _: None = Depends(require_admin)):
+    username = (payload.get("username") or "").strip()
+    new_password = payload.get("new_password") or ""
+    if not username or not new_password:
+        raise HTTPException(status_code=400, detail="缺少 username 或 new_password")
+    if len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="新密码长度至少 6 位")
+    user = auth.get_user_by_username(username)
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    auth.update_password_by_user_id(user.id, new_password)
+    auth.delete_sessions_by_user_id(user.id)
+    return {"status": "success"}
 
 @app.post("/upload")
 async def upload_file(

@@ -121,3 +121,56 @@ def test_admin_users_count(tmp_path: Path, monkeypatch):
     r2 = client.get("/api/admin/users_count", headers={"X-Admin-Token": "admintoken"})
     assert r2.status_code == 200
     assert r2.json()["user_count"] == 2
+
+
+def test_change_password_and_invalidate_sessions(tmp_path: Path, monkeypatch):
+    db_path = tmp_path / "app.db"
+    monkeypatch.setenv("APP_DB_PATH", str(db_path))
+    monkeypatch.setenv("INVITE_CODE", "abc123")
+    client = TestClient(main.app)
+
+    client.post("/api/auth/register", json={"invite_code": "abc123", "username": "alice", "password": "oldpw"})
+    token = client.post("/api/auth/login", json={"username": "alice", "password": "oldpw"}).json()["token"]
+
+    r = client.post(
+        "/api/profile/password",
+        json={"old_password": "oldpw", "new_password": "newpw123"},
+        headers={"Authorization": "Bearer " + token},
+    )
+    assert r.status_code == 200
+    assert r.json()["status"] == "success"
+
+    r2 = client.get("/api/auth/me", headers={"Authorization": "Bearer " + token})
+    assert r2.status_code == 401
+
+    r3 = client.post("/api/auth/login", json={"username": "alice", "password": "oldpw"})
+    assert r3.status_code == 401
+    r4 = client.post("/api/auth/login", json={"username": "alice", "password": "newpw123"})
+    assert r4.status_code == 200
+
+
+def test_admin_reset_password(tmp_path: Path, monkeypatch):
+    db_path = tmp_path / "app.db"
+    monkeypatch.setenv("APP_DB_PATH", str(db_path))
+    monkeypatch.setenv("INVITE_CODE", "abc123")
+    monkeypatch.setenv("ADMIN_TOKEN", "admintoken")
+    client = TestClient(main.app)
+
+    client.post("/api/auth/register", json={"invite_code": "abc123", "username": "alice", "password": "pw1"})
+    token = client.post("/api/auth/login", json={"username": "alice", "password": "pw1"}).json()["token"]
+
+    r = client.post(
+        "/api/admin/reset_password",
+        json={"username": "alice", "new_password": "pw2xxxxx"},
+        headers={"X-Admin-Token": "admintoken"},
+    )
+    assert r.status_code == 200
+    assert r.json()["status"] == "success"
+
+    r2 = client.get("/api/auth/me", headers={"Authorization": "Bearer " + token})
+    assert r2.status_code == 401
+
+    r3 = client.post("/api/auth/login", json={"username": "alice", "password": "pw1"})
+    assert r3.status_code == 401
+    r4 = client.post("/api/auth/login", json={"username": "alice", "password": "pw2xxxxx"})
+    assert r4.status_code == 200
