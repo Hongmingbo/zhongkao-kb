@@ -195,6 +195,16 @@ def set_avatar_filename(user_id: int, avatar_filename: str) -> str:
         conn.close()
 
 
+def get_users_count() -> int:
+    init_db()
+    conn = get_conn()
+    try:
+        row = conn.execute("SELECT COUNT(*) as c FROM users").fetchone()
+        return int(row["c"]) if row else 0
+    finally:
+        conn.close()
+
+
 def parse_bearer(authorization: Optional[str]) -> Optional[str]:
     if not authorization:
         return None

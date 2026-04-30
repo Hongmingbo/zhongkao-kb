@@ -100,3 +100,21 @@ def test_avatar_default_and_upload(tmp_path: Path, monkeypatch):
     assert r2.status_code == 200
     assert r2.headers.get("content-type", "").startswith("image/png")
     assert r2.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_admin_users_count(tmp_path: Path, monkeypatch):
+    db_path = tmp_path / "app.db"
+    monkeypatch.setenv("APP_DB_PATH", str(db_path))
+    monkeypatch.setenv("INVITE_CODE", "abc123")
+    monkeypatch.setenv("ADMIN_TOKEN", "admintoken")
+    client = TestClient(main.app)
+
+    client.post("/api/auth/register", json={"invite_code": "abc123", "username": "u1", "password": "pw"})
+    client.post("/api/auth/register", json={"invite_code": "abc123", "username": "u2", "password": "pw"})
+
+    r1 = client.get("/api/admin/users_count")
+    assert r1.status_code in [403, 503]
+
+    r2 = client.get("/api/admin/users_count", headers={"X-Admin-Token": "admintoken"})
+    assert r2.status_code == 200
+    assert r2.json()["user_count"] == 2

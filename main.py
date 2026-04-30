@@ -84,6 +84,14 @@ def validate_path_segment(value: str, field: str):
     if not value or ".." in value or "/" in value or "\\" in value:
         raise HTTPException(status_code=400, detail=f"非法参数: {field}")
 
+
+def require_admin(x_admin_token: Optional[str] = Header(None)) -> None:
+    token = (os.getenv("ADMIN_TOKEN") or "").strip()
+    if not token:
+        raise HTTPException(status_code=503, detail="未配置 ADMIN_TOKEN")
+    if not x_admin_token or x_admin_token != token:
+        raise HTTPException(status_code=403, detail="无权限")
+
 SUBJECT_KEYWORDS = {
     "语文": ["语文", "阅读", "作文", "古诗", "文言文", "chinese"],
     "数学": ["数学", "几何", "代数", "函数", "方程", "math"],
@@ -562,6 +570,11 @@ async def get_profile_avatar(current_user: auth.User = Depends(auth.get_current_
                 ct = "image/webp"
             return Response(content=avatar_path.read_bytes(), media_type=ct)
     return Response(content=DEFAULT_AVATAR_SVG, media_type="image/svg+xml")
+
+
+@app.get("/api/admin/users_count")
+async def admin_users_count(_: None = Depends(require_admin)):
+    return {"user_count": auth.get_users_count()}
 
 @app.post("/upload")
 async def upload_file(
