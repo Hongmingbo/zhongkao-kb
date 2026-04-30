@@ -70,12 +70,19 @@ STATIC_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 try:
-    _db_env = (os.getenv("APP_DB_PATH") or "").strip()
-    _db_path = auth.db_path()
     _logger = logging.getLogger("uvicorn.error")
-    _logger.info("[startup] DB_PATH=%s APP_DB_PATH=%s", _db_path, "(default)" if not _db_env else _db_env)
+    _backend = auth.db_backend()
+    _logger.info("[startup] AUTH_DB_BACKEND=%s", _backend)
+    print(f"[startup] AUTH_DB_BACKEND={_backend}", flush=True)
+    if _backend == "postgres":
+        _logger.info("[startup] DATABASE_URL=set")
+        print("[startup] DATABASE_URL=set", flush=True)
+    else:
+        _db_env = (os.getenv("APP_DB_PATH") or "").strip()
+        _db_path = auth.db_path()
+        _logger.info("[startup] DB_PATH=%s APP_DB_PATH=%s", _db_path, "(default)" if not _db_env else _db_env)
+        print(f"[startup] DB_PATH={_db_path} APP_DB_PATH={'(default)' if not _db_env else _db_env}", flush=True)
     _logger.info("[startup] KNOWLEDGE_BASE_DIR=%s", KNOWLEDGE_BASE_DIR)
-    print(f"[startup] DB_PATH={_db_path} APP_DB_PATH={'(default)' if not _db_env else _db_env}", flush=True)
     print(f"[startup] KNOWLEDGE_BASE_DIR={KNOWLEDGE_BASE_DIR}", flush=True)
     auth.init_db()
     _logger.info("[startup] DB_INIT_OK")

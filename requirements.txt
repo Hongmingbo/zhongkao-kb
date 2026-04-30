@@ -9,3 +9,4 @@ pytesseract
 pdf2image
 pytest
 httpx
+psycopg2-binary
