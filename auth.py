@@ -52,6 +52,11 @@ def init_db():
             )
             """
         )
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
+        if "nickname" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN nickname TEXT")
+        if "avatar_filename" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN avatar_filename TEXT")
         conn.commit()
     finally:
         conn.close()
@@ -151,6 +156,45 @@ def get_user_by_token(token: str) -> Optional[User]:
         conn.close()
 
 
+def get_profile(user_id: int) -> dict:
+    init_db()
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            "SELECT nickname, avatar_filename FROM users WHERE id=?",
+            (user_id,),
+        ).fetchone()
+        if not row:
+            return {"nickname": "", "avatar_filename": ""}
+        nickname = row["nickname"] or ""
+        avatar_filename = row["avatar_filename"] or ""
+        return {"nickname": nickname, "avatar_filename": avatar_filename}
+    finally:
+        conn.close()
+
+
+def set_nickname(user_id: int, nickname: str) -> str:
+    init_db()
+    conn = get_conn()
+    try:
+        conn.execute("UPDATE users SET nickname=? WHERE id=?", (nickname, user_id))
+        conn.commit()
+        return nickname
+    finally:
+        conn.close()
+
+
+def set_avatar_filename(user_id: int, avatar_filename: str) -> str:
+    init_db()
+    conn = get_conn()
+    try:
+        conn.execute("UPDATE users SET avatar_filename=? WHERE id=?", (avatar_filename, user_id))
+        conn.commit()
+        return avatar_filename
+    finally:
+        conn.close()
+
+
 def parse_bearer(authorization: Optional[str]) -> Optional[str]:
     if not authorization:
         return None
@@ -170,4 +214,3 @@ def get_current_user(authorization: Optional[str] = Header(None)) -> User:
     if not user:
         raise HTTPException(status_code=401, detail="登录已过期")
     return user
-

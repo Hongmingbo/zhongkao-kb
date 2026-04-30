@@ -30,6 +30,8 @@ def test_register_login_me(tmp_path: Path, monkeypatch):
     assert r3.status_code == 200
     data = r3.json()
     assert data["username"] == "alice"
+    assert "nickname" in data
+    assert "has_avatar" in data
 
 
 def test_kb_isolated_by_user(tmp_path: Path, monkeypatch):
@@ -55,3 +57,46 @@ def test_kb_isolated_by_user(tmp_path: Path, monkeypatch):
     assert r1.status_code == 200 and "语文" in r1.json()
     assert r2.status_code == 200 and r2.json() == {}
 
+
+def test_set_nickname(tmp_path: Path, monkeypatch):
+    db_path = tmp_path / "app.db"
+    monkeypatch.setenv("APP_DB_PATH", str(db_path))
+    monkeypatch.setenv("INVITE_CODE", "abc123")
+    client = TestClient(main.app)
+    client.post("/api/auth/register", json={"invite_code": "abc123", "username": "alice", "password": "pw"})
+    token = client.post("/api/auth/login", json={"username": "alice", "password": "pw"}).json()["token"]
+
+    r = client.post("/api/profile/nickname", json={"nickname": "小明"}, headers={"Authorization": "Bearer " + token})
+    assert r.status_code == 200
+    assert r.json()["nickname"] == "小明"
+
+    r2 = client.get("/api/auth/me", headers={"Authorization": "Bearer " + token})
+    assert r2.status_code == 200
+    assert r2.json()["nickname"] == "小明"
+
+
+def test_avatar_default_and_upload(tmp_path: Path, monkeypatch):
+    db_path = tmp_path / "app.db"
+    monkeypatch.setenv("APP_DB_PATH", str(db_path))
+    monkeypatch.setenv("INVITE_CODE", "abc123")
+    client = TestClient(main.app)
+    client.post("/api/auth/register", json={"invite_code": "abc123", "username": "alice", "password": "pw"})
+    token = client.post("/api/auth/login", json={"username": "alice", "password": "pw"}).json()["token"]
+
+    r0 = client.get("/api/profile/avatar", headers={"Authorization": "Bearer " + token})
+    assert r0.status_code == 200
+    assert r0.headers.get("content-type", "").startswith("image/")
+    assert len(r0.content) > 0
+
+    png = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+        b"\x00\x00\x00\x0cIDATx\x9cc\xf8\xff\xff?\x00\x05\xfe\x02\xfeA\xd9\xdd\xa6\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+    files = {"file": ("avatar.png", png, "image/png")}
+    r1 = client.post("/api/profile/avatar", files=files, headers={"Authorization": "Bearer " + token})
+    assert r1.status_code == 200
+
+    r2 = client.get("/api/profile/avatar", headers={"Authorization": "Bearer " + token})
+    assert r2.status_code == 200
+    assert r2.headers.get("content-type", "").startswith("image/png")
+    assert r2.content[:8] == b"\x89PNG\r\n\x1a\n"

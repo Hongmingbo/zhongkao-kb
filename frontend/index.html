@@ -18,7 +18,9 @@
 
     <div class="flex items-center justify-end mb-4">
       <div id="user-bar" class="hidden text-sm text-gray-600">
-        <span id="current-user" class="font-medium text-gray-800"></span>
+        <img id="avatarImg" class="w-8 h-8 rounded-full object-cover border border-gray-200" alt="avatar">
+        <span id="current-user" class="ml-2 font-medium text-gray-800"></span>
+        <button id="settingsBtn" class="ml-3 text-blue-500 hover:text-blue-700">设置</button>
         <button id="logoutBtn" class="ml-3 text-red-500 hover:text-red-700">退出</button>
       </div>
     </div>
@@ -154,6 +156,40 @@
     </div>
   </div>
 
+  <div id="profile-modal" class="fixed inset-0 z-50 hidden bg-gray-900 bg-opacity-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-lg w-full max-w-md">
+      <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+        <div class="text-lg font-semibold text-gray-800">个人资料</div>
+        <button id="closeProfile" class="text-gray-400 hover:text-gray-600 focus:outline-none">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <div class="p-4 space-y-4">
+        <div>
+          <div class="text-sm font-medium text-gray-700 mb-1">昵称</div>
+          <div class="flex gap-2">
+            <input id="nicknameInput" class="flex-1 px-3 py-2 border rounded-lg text-sm" placeholder="请输入昵称（1-20字）">
+            <button id="saveNicknameBtn" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">保存</button>
+          </div>
+        </div>
+        <div>
+          <div class="text-sm font-medium text-gray-700 mb-1">头像</div>
+          <div class="flex items-center gap-3">
+            <img id="profileAvatarPreview" class="w-12 h-12 rounded-full object-cover border border-gray-200" alt="avatar">
+            <div class="flex-1">
+              <input id="avatarFile" type="file" accept="image/png,image/jpeg,image/webp" class="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200">
+              <div class="text-xs text-gray-500 mt-1">支持 png/jpg/webp，最大 2MB</div>
+            </div>
+          </div>
+          <div class="mt-2 flex justify-end">
+            <button id="uploadAvatarBtn" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">上传头像</button>
+          </div>
+        </div>
+        <div id="profile-msg" class="text-sm"></div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const dropZone = document.getElementById('drop-zone')
     const fileInput = document.getElementById('file-upload')
@@ -194,8 +230,18 @@
     const registerPassword = document.getElementById('registerPassword')
     const registerBtn = document.getElementById('registerBtn')
     const userBar = document.getElementById('user-bar')
+    const avatarImg = document.getElementById('avatarImg')
     const currentUserEl = document.getElementById('current-user')
+    const settingsBtn = document.getElementById('settingsBtn')
     const logoutBtn = document.getElementById('logoutBtn')
+    const profileModal = document.getElementById('profile-modal')
+    const closeProfileBtn = document.getElementById('closeProfile')
+    const nicknameInput = document.getElementById('nicknameInput')
+    const saveNicknameBtn = document.getElementById('saveNicknameBtn')
+    const avatarFile = document.getElementById('avatarFile')
+    const uploadAvatarBtn = document.getElementById('uploadAvatarBtn')
+    const profileAvatarPreview = document.getElementById('profileAvatarPreview')
+    const profileMsg = document.getElementById('profile-msg')
 
     const MAX_BATCH_FILES = 50
     const UPLOAD_CONCURRENCY = 3
@@ -210,14 +256,34 @@
     function setToken(t) { localStorage.setItem(TOKEN_KEY, t) }
     function clearToken() { localStorage.removeItem(TOKEN_KEY) }
 
+    let avatarObjectUrl = ''
+
     function renderUserBar(user) {
       if (user && user.username) {
         userBar.classList.remove('hidden')
-        currentUserEl.textContent = user.username
+        currentUserEl.textContent = user.nickname ? user.nickname : user.username
         return
       }
       userBar.classList.add('hidden')
       currentUserEl.textContent = ''
+    }
+
+    function setProfileMsg(text, ok) {
+      profileMsg.className = ok ? 'text-sm text-green-700' : 'text-sm text-red-700'
+      profileMsg.textContent = text
+    }
+
+    function showProfileModal() {
+      profileModal.classList.remove('hidden')
+      setProfileMsg('', true)
+      nicknameInput.value = currentUserEl.textContent || ''
+      profileAvatarPreview.src = avatarImg.src || ''
+    }
+
+    function hideProfileModal() {
+      profileModal.classList.add('hidden')
+      setProfileMsg('', true)
+      avatarFile.value = ''
     }
 
     function setAuthMsg(text, ok) {
@@ -260,6 +326,17 @@
         showAuthModal()
       }
       return res
+    }
+
+    async function loadAvatar() {
+      try {
+        const r = await apiFetch('/api/profile/avatar')
+        if (!r.ok) return
+        const blob = await r.blob()
+        if (avatarObjectUrl) URL.revokeObjectURL(avatarObjectUrl)
+        avatarObjectUrl = URL.createObjectURL(blob)
+        avatarImg.src = avatarObjectUrl
+      } catch (e) {}
     }
 
     function getApiBase() {
@@ -846,7 +923,15 @@
           return
         }
         setToken(data.token)
-        renderUserBar(data.user)
+        const rMe = await apiFetch('/api/auth/me')
+        const me = await rMe.json().catch(() => ({}))
+        if (rMe.ok && me && me.username) {
+          renderUserBar(me)
+          await loadAvatar()
+        } else {
+          renderUserBar(data.user)
+          await loadAvatar()
+        }
         hideAuthModal()
         await loadStats()
       } catch (e) {
@@ -881,9 +966,57 @@
 
     logoutBtn.addEventListener('click', async () => {
       try { await apiFetch('/api/auth/logout', { method: 'POST' }) } catch (e) {}
+      if (avatarObjectUrl) URL.revokeObjectURL(avatarObjectUrl)
+      avatarObjectUrl = ''
       clearToken()
       renderUserBar(null)
       showAuthModal()
+    })
+
+    settingsBtn.addEventListener('click', showProfileModal)
+    closeProfileBtn.addEventListener('click', hideProfileModal)
+    profileModal.addEventListener('click', (e) => { if (e.target === profileModal) hideProfileModal() })
+
+    saveNicknameBtn.addEventListener('click', async () => {
+      const nickname = (nicknameInput.value || '').trim()
+      try {
+        const r = await apiFetch('/api/profile/nickname', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nickname }),
+        })
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok || data.status !== 'success') {
+          setProfileMsg((data && data.detail) || '保存失败', false)
+          return
+        }
+        const rMe = await apiFetch('/api/auth/me')
+        const me = await rMe.json().catch(() => ({}))
+        if (rMe.ok && me && me.username) renderUserBar(me)
+        setProfileMsg('昵称已保存。', true)
+      } catch (e) {
+        setProfileMsg('保存失败', false)
+      }
+    })
+
+    uploadAvatarBtn.addEventListener('click', async () => {
+      const f = avatarFile.files && avatarFile.files[0]
+      if (!f) { setProfileMsg('请先选择头像文件。', false); return }
+      const fd = new FormData()
+      fd.append('file', f)
+      try {
+        const r = await apiFetch('/api/profile/avatar', { method: 'POST', body: fd })
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok || data.status !== 'success') {
+          setProfileMsg((data && data.detail) || '上传失败', false)
+          return
+        }
+        await loadAvatar()
+        profileAvatarPreview.src = avatarImg.src || ''
+        setProfileMsg('头像已更新。', true)
+      } catch (e) {
+        setProfileMsg('上传失败', false)
+      }
     })
     clearBtn.addEventListener('click', async () => {
       const base = getApiBase()
@@ -920,6 +1053,7 @@
         const data = await r.json().catch(() => ({}))
         if (r.ok && data && data.username) {
           renderUserBar(data)
+          await loadAvatar()
           await loadStats()
           return
         }

@@ -9,7 +9,7 @@ import datetime as dt
 from typing import Optional
 from pathlib import Path
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Body, Depends, Header
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from zoneinfo import ZoneInfo
@@ -72,6 +72,13 @@ def user_kb_dir(user_id: int) -> Path:
     d = KNOWLEDGE_BASE_DIR / f"u_{user_id}"
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+def user_profile_dir(user_id: int) -> Path:
+    d = user_kb_dir(user_id) / "_profile"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+DEFAULT_AVATAR_SVG = b"""<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#60a5fa"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs><rect width="128" height="128" rx="64" fill="url(#g)"/><circle cx="64" cy="52" r="22" fill="#eff6ff"/><path d="M22 114c8-22 26-32 42-32s34 10 42 32" fill="#eff6ff"/></svg>"""
 
 def validate_path_segment(value: str, field: str):
     if not value or ".." in value or "/" in value or "\\" in value:
@@ -492,7 +499,69 @@ async def logout(
 
 @app.get("/api/auth/me")
 async def me(current_user: auth.User = Depends(auth.get_current_user)):
-    return {"id": current_user.id, "username": current_user.username}
+    p = auth.get_profile(current_user.id)
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "nickname": p.get("nickname") or "",
+        "has_avatar": bool(p.get("avatar_filename")),
+    }
+
+
+@app.post("/api/profile/nickname")
+async def set_profile_nickname(
+    payload: dict = Body(...),
+    current_user: auth.User = Depends(auth.get_current_user),
+):
+    nickname = (payload.get("nickname") or "").strip()
+    if nickname and (len(nickname) < 1 or len(nickname) > 20):
+        raise HTTPException(status_code=400, detail="昵称长度应为 1-20")
+    auth.set_nickname(current_user.id, nickname)
+    return {"status": "success", "nickname": nickname}
+
+
+@app.post("/api/profile/avatar")
+async def upload_profile_avatar(
+    file: UploadFile = File(...),
+    current_user: auth.User = Depends(auth.get_current_user),
+):
+    allowed = {
+        "image/png": "png",
+        "image/jpeg": "jpg",
+        "image/webp": "webp",
+    }
+    ext = allowed.get(file.content_type or "")
+    if not ext:
+        raise HTTPException(status_code=400, detail="仅支持 png/jpg/webp")
+
+    content = await file.read()
+    if len(content) > 2 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="头像文件过大（最大 2MB）")
+
+    pdir = user_profile_dir(current_user.id)
+    avatar_filename = f"avatar.{ext}"
+    avatar_path = pdir / avatar_filename
+    avatar_path.write_bytes(content)
+    auth.set_avatar_filename(current_user.id, avatar_filename)
+    return {"status": "success"}
+
+
+@app.get("/api/profile/avatar")
+async def get_profile_avatar(current_user: auth.User = Depends(auth.get_current_user)):
+    p = auth.get_profile(current_user.id)
+    avatar_filename = (p.get("avatar_filename") or "").strip()
+    if avatar_filename:
+        pdir = user_profile_dir(current_user.id)
+        avatar_path = pdir / avatar_filename
+        if avatar_path.exists() and avatar_path.is_file():
+            ext = avatar_path.suffix.lower().lstrip(".")
+            ct = "image/png"
+            if ext in ["jpg", "jpeg"]:
+                ct = "image/jpeg"
+            elif ext == "webp":
+                ct = "image/webp"
+            return Response(content=avatar_path.read_bytes(), media_type=ct)
+    return Response(content=DEFAULT_AVATAR_SVG, media_type="image/svg+xml")
 
 @app.post("/upload")
 async def upload_file(
