@@ -6,6 +6,7 @@ import tempfile
 import re
 import json
 import datetime as dt
+import logging
 from typing import Optional
 from pathlib import Path
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Body, Depends, Header
@@ -71,10 +72,14 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 try:
     _db_env = (os.getenv("APP_DB_PATH") or "").strip()
     _db_path = auth.db_path()
-    print(f"[startup] DB_PATH={_db_path} APP_DB_PATH={'(default)' if not _db_env else _db_env}")
-    print(f"[startup] KNOWLEDGE_BASE_DIR={KNOWLEDGE_BASE_DIR}")
+    _logger = logging.getLogger("uvicorn.error")
+    _logger.info("[startup] DB_PATH=%s APP_DB_PATH=%s", _db_path, "(default)" if not _db_env else _db_env)
+    _logger.info("[startup] KNOWLEDGE_BASE_DIR=%s", KNOWLEDGE_BASE_DIR)
+    print(f"[startup] DB_PATH={_db_path} APP_DB_PATH={'(default)' if not _db_env else _db_env}", flush=True)
+    print(f"[startup] KNOWLEDGE_BASE_DIR={KNOWLEDGE_BASE_DIR}", flush=True)
 except Exception as _e:
-    print(f"[startup] PATH_LOG_ERROR={_e}")
+    logging.getLogger("uvicorn.error").exception("[startup] PATH_LOG_ERROR=%s", _e)
+    print(f"[startup] PATH_LOG_ERROR={_e}", flush=True)
 
 def user_kb_dir(user_id: int) -> Path:
     d = KNOWLEDGE_BASE_DIR / f"u_{user_id}"
