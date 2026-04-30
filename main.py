@@ -68,6 +68,14 @@ STATIC_DIR.mkdir(parents=True, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+try:
+    _db_env = (os.getenv("APP_DB_PATH") or "").strip()
+    _db_path = auth.db_path()
+    print(f"[startup] DB_PATH={_db_path} APP_DB_PATH={'(default)' if not _db_env else _db_env}")
+    print(f"[startup] KNOWLEDGE_BASE_DIR={KNOWLEDGE_BASE_DIR}")
+except Exception as _e:
+    print(f"[startup] PATH_LOG_ERROR={_e}")
+
 def user_kb_dir(user_id: int) -> Path:
     d = KNOWLEDGE_BASE_DIR / f"u_{user_id}"
     d.mkdir(parents=True, exist_ok=True)
