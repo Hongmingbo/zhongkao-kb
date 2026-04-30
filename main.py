@@ -77,6 +77,9 @@ try:
     _logger.info("[startup] KNOWLEDGE_BASE_DIR=%s", KNOWLEDGE_BASE_DIR)
     print(f"[startup] DB_PATH={_db_path} APP_DB_PATH={'(default)' if not _db_env else _db_env}", flush=True)
     print(f"[startup] KNOWLEDGE_BASE_DIR={KNOWLEDGE_BASE_DIR}", flush=True)
+    auth.init_db()
+    _logger.info("[startup] DB_INIT_OK")
+    print("[startup] DB_INIT_OK", flush=True)
 except Exception as _e:
     logging.getLogger("uvicorn.error").exception("[startup] PATH_LOG_ERROR=%s", _e)
     print(f"[startup] PATH_LOG_ERROR={_e}", flush=True)
