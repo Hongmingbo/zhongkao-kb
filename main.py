@@ -1,12 +1,14 @@
 import os
 import shutil
 import hashlib
+import secrets
 import zipfile
 import tempfile
 import re
 import json
 import datetime as dt
 import logging
+import time
 from typing import Optional
 from pathlib import Path
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Body, Depends, Header
@@ -100,6 +102,49 @@ def user_profile_dir(user_id: int) -> Path:
     d = user_kb_dir(user_id) / "_profile"
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def user_trash_dir(user_id: int) -> Path:
+    d = user_kb_dir(user_id) / "_trash"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _trash_index_path(trash_dir: Path) -> Path:
+    return trash_dir / "trash.json"
+
+
+def _load_trash_index(trash_dir: Path) -> list:
+    p = _trash_index_path(trash_dir)
+    if not p.exists():
+        return []
+    try:
+        data = json.loads(p.read_text(encoding="utf-8", errors="ignore") or "[]")
+    except Exception:
+        data = []
+    return data if isinstance(data, list) else []
+
+
+def _save_trash_index(trash_dir: Path, items: list):
+    p = _trash_index_path(trash_dir)
+    p.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _unique_restore_name(dest_dir: Path, filename: str) -> str:
+    if not (dest_dir / filename).exists():
+        return filename
+    stem = Path(filename).stem
+    suffix = "".join(Path(filename).suffixes)
+    ts = dt.datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    candidate = f"{stem}-restored-{ts}{suffix}"
+    if not (dest_dir / candidate).exists():
+        return candidate
+    i = 2
+    while True:
+        c = f"{stem}-restored-{ts}-{i}{suffix}"
+        if not (dest_dir / c).exists():
+            return c
+        i += 1
 
 DEFAULT_AVATAR_SVG = b"""<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#60a5fa"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs><rect width="128" height="128" rx="64" fill="url(#g)"/><circle cx="64" cy="52" r="22" fill="#eff6ff"/><path d="M22 114c8-22 26-32 42-32s34 10 42 32" fill="#eff6ff"/></svg>"""
 
@@ -959,11 +1004,106 @@ async def delete_file(
         raise HTTPException(status_code=404, detail="文件不存在")
         
     try:
-        os.remove(file_path)
-        # 尝试删除对应的meta文件
+        trash_dir = user_trash_dir(current_user.id)
+        item_id = secrets.token_hex(12)
+        now = int(time.time())
+
         meta_path = file_path.with_name(file_path.name + ".meta.json")
+        trash_file = trash_dir / f"{item_id}.file"
+        trash_meta = trash_dir / f"{item_id}.meta.json"
+
+        shutil.move(str(file_path), str(trash_file))
         if meta_path.exists():
-            os.remove(meta_path)
-        return {"status": "success", "message": f"文件 {filename} 已删除"}
+            shutil.move(str(meta_path), str(trash_meta))
+
+        items = _load_trash_index(trash_dir)
+        items.insert(
+            0,
+            {
+                "id": item_id,
+                "filename": filename,
+                "category": category,
+                "deleted_at": now,
+                "has_meta": (trash_meta.exists()),
+            },
+        )
+        _save_trash_index(trash_dir, items[:2000])
+        return {"status": "success", "message": f"文件 {filename} 已移入回收站"}
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+@app.get("/api/trash")
+async def list_trash(current_user: auth.User = Depends(auth.get_current_user)):
+    trash_dir = user_trash_dir(current_user.id)
+    items = _load_trash_index(trash_dir)
+    return {"items": items}
+
+
+@app.post("/api/trash/restore")
+async def restore_trash(payload: dict = Body(...), current_user: auth.User = Depends(auth.get_current_user)):
+    item_id = (payload.get("id") or "").strip()
+    if not item_id:
+        raise HTTPException(status_code=400, detail="缺少 id")
+
+    kb_dir = user_kb_dir(current_user.id)
+    trash_dir = user_trash_dir(current_user.id)
+    items = _load_trash_index(trash_dir)
+    item = next((x for x in items if x.get("id") == item_id), None)
+    if not item:
+        raise HTTPException(status_code=404, detail="回收站条目不存在")
+
+    category = item.get("category") or ""
+    filename = item.get("filename") or ""
+    validate_path_segment(category, "category")
+    validate_path_segment(filename, "filename")
+
+    src_file = trash_dir / f"{item_id}.file"
+    src_meta = trash_dir / f"{item_id}.meta.json"
+    if not src_file.exists():
+        raise HTTPException(status_code=404, detail="回收站文件不存在")
+
+    dest_dir = kb_dir / category
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest_name = _unique_restore_name(dest_dir, filename)
+    dest_file = dest_dir / dest_name
+    dest_meta = dest_file.with_name(dest_file.name + ".meta.json")
+
+    shutil.move(str(src_file), str(dest_file))
+    if src_meta.exists():
+        shutil.move(str(src_meta), str(dest_meta))
+
+    items = [x for x in items if x.get("id") != item_id]
+    _save_trash_index(trash_dir, items)
+    return {"status": "success", "restored": {"category": category, "filename": dest_name}}
+
+
+@app.delete("/api/trash/clear")
+async def clear_trash(current_user: auth.User = Depends(auth.get_current_user)):
+    trash_dir = user_trash_dir(current_user.id)
+    items = _load_trash_index(trash_dir)
+    for x in items:
+        item_id = (x.get("id") or "").strip()
+        if not item_id:
+            continue
+        (trash_dir / f"{item_id}.file").unlink(missing_ok=True)
+        (trash_dir / f"{item_id}.meta.json").unlink(missing_ok=True)
+    _save_trash_index(trash_dir, [])
+    return {"status": "success"}
+
+
+@app.delete("/api/trash/{item_id}")
+async def delete_trash_item(item_id: str, current_user: auth.User = Depends(auth.get_current_user)):
+    item_id = (item_id or "").strip()
+    if not item_id:
+        raise HTTPException(status_code=400, detail="缺少 id")
+    trash_dir = user_trash_dir(current_user.id)
+    items = _load_trash_index(trash_dir)
+    if not any(x.get("id") == item_id for x in items):
+        raise HTTPException(status_code=404, detail="回收站条目不存在")
+
+    (trash_dir / f"{item_id}.file").unlink(missing_ok=True)
+    (trash_dir / f"{item_id}.meta.json").unlink(missing_ok=True)
+    items = [x for x in items if x.get("id") != item_id]
+    _save_trash_index(trash_dir, items)
+    return {"status": "success"}

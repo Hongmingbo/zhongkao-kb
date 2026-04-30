@@ -174,3 +174,54 @@ def test_admin_reset_password(tmp_path: Path, monkeypatch):
     assert r3.status_code == 401
     r4 = client.post("/api/auth/login", json={"username": "alice", "password": "pw2xxxxx"})
     assert r4.status_code == 200
+
+
+def test_trash_delete_restore_and_clear(tmp_path: Path, monkeypatch):
+    db_path = tmp_path / "app.db"
+    monkeypatch.setenv("APP_DB_PATH", str(db_path))
+    monkeypatch.setenv("INVITE_CODE", "abc123")
+    client = TestClient(main.app)
+
+    client.post("/api/auth/register", json={"invite_code": "abc123", "username": "u1", "password": "pw"})
+    token = client.post("/api/auth/login", json={"username": "u1", "password": "pw"}).json()["token"]
+
+    kb_root = tmp_path / "kb"
+    kb_root.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(main, "KNOWLEDGE_BASE_DIR", kb_root)
+
+    cat_dir = kb_root / "u_1" / "语文"
+    cat_dir.mkdir(parents=True, exist_ok=True)
+    (cat_dir / "a.md").write_text("x", encoding="utf-8")
+    (cat_dir / "a.md.meta.json").write_text('{"year":"2024"}', encoding="utf-8")
+
+    d = client.delete("/api/file/语文/a.md", headers={"Authorization": "Bearer " + token})
+    assert d.status_code == 200
+
+    r = client.get("/api/trash", headers={"Authorization": "Bearer " + token})
+    assert r.status_code == 200
+    items = r.json().get("items") or []
+    assert len(items) == 1
+    tid = items[0]["id"]
+
+    cat_dir.mkdir(parents=True, exist_ok=True)
+    (cat_dir / "a.md").write_text("y", encoding="utf-8")
+    rr = client.post("/api/trash/restore", json={"id": tid}, headers={"Authorization": "Bearer " + token})
+    assert rr.status_code == 200
+    restored = rr.json()["restored"]["filename"]
+    assert restored != ""
+    assert (cat_dir / restored).exists()
+
+    r2 = client.get("/api/trash", headers={"Authorization": "Bearer " + token})
+    assert r2.status_code == 200
+    assert (r2.json().get("items") or []) == []
+
+    d2 = client.delete("/api/file/语文/" + restored, headers={"Authorization": "Bearer " + token})
+    assert d2.status_code == 200
+    r3 = client.get("/api/trash", headers={"Authorization": "Bearer " + token})
+    items2 = r3.json().get("items") or []
+    assert len(items2) == 1
+
+    c = client.delete("/api/trash/clear", headers={"Authorization": "Bearer " + token})
+    assert c.status_code == 200
+    r4 = client.get("/api/trash", headers={"Authorization": "Bearer " + token})
+    assert (r4.json().get("items") or []) == []
