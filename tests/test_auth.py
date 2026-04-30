@@ -51,10 +51,13 @@ def test_kb_isolated_by_user(tmp_path: Path, monkeypatch):
 
     (kb_root / "u_1" / "语文").mkdir(parents=True)
     (kb_root / "u_1" / "语文" / "a.md").write_text("x", encoding="utf-8")
+    (kb_root / "u_1" / "_profile").mkdir(parents=True)
+    (kb_root / "u_1" / "_profile" / "avatar.png").write_bytes(b"\x89PNG\r\n\x1a\n")
 
     r1 = client.get("/api/stats", headers={"Authorization": "Bearer " + t1})
     r2 = client.get("/api/stats", headers={"Authorization": "Bearer " + t2})
     assert r1.status_code == 200 and "语文" in r1.json()
+    assert "_profile" not in r1.json()
     assert r2.status_code == 200 and r2.json() == {}
 
 

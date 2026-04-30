@@ -110,9 +110,11 @@ def _iter_target_files(base_dir: Path, category: Optional[str]):
     if category:
         dirs = [base_dir / category]
     else:
-        dirs = [p for p in base_dir.iterdir() if p.is_dir()]
+        dirs = [p for p in base_dir.iterdir() if p.is_dir() and not p.name.startswith("_")]
     for d in dirs:
         if not d.exists() or not d.is_dir():
+            continue
+        if d.name.startswith("_"):
             continue
         for f in d.iterdir():
             if not f.is_file():
@@ -621,7 +623,7 @@ async def get_stats(current_user: auth.User = Depends(auth.get_current_user)):
     stats = {}
     kb_dir = user_kb_dir(current_user.id)
     for item in kb_dir.iterdir():
-        if item.is_dir():
+        if item.is_dir() and not item.name.startswith("_"):
             files = []
             for f in item.iterdir():
                 if f.is_file() and not f.name.endswith(".meta.json"):
@@ -706,7 +708,7 @@ async def get_daily_quote():
 @app.get("/api/filters/options")
 async def get_filter_options(current_user: auth.User = Depends(auth.get_current_user)):
     kb_dir = user_kb_dir(current_user.id)
-    categories = sorted([p.name for p in kb_dir.iterdir() if p.is_dir()])
+    categories = sorted([p.name for p in kb_dir.iterdir() if p.is_dir() and not p.name.startswith("_")])
 
     exts = set()
     years = set()
