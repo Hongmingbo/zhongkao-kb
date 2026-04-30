@@ -1,3 +1,7 @@
 __pycache__/
+.pytest_cache/
+*.db
+*.sqlite
+*.sqlite3
 knowledge_base/**
 !knowledge_base/.gitkeep
