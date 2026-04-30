@@ -11,6 +11,18 @@ import main
 from main import search_knowledge_base
 
 
+def _create_user_and_token(client: TestClient, monkeypatch, tmp_path: Path, username: str):
+    monkeypatch.setenv("APP_DB_PATH", str(tmp_path / "app.db"))
+    monkeypatch.setenv("INVITE_CODE", "abc123")
+    r = client.post("/api/auth/register", json={"invite_code": "abc123", "username": username, "password": "pw"})
+    if r.status_code == 200:
+        user_id = r.json()["user"]["id"]
+    else:
+        user_id = None
+    token = client.post("/api/auth/login", json={"username": username, "password": "pw"}).json()["token"]
+    return user_id, token
+
+
 def test_search_matches_filename_and_content(tmp_path: Path):
     kb = tmp_path / "knowledge_base"
     (kb / "语文").mkdir(parents=True)
@@ -35,15 +47,17 @@ def test_search_matches_filename_and_content(tmp_path: Path):
     assert "古诗.txt" in filenames
 
 
-def test_api_search_returns_results(tmp_path: Path):
-    kb = tmp_path / "knowledge_base"
-    (kb / "语文").mkdir(parents=True)
-    (kb / "语文" / "语文.md").write_text("这是文言文复习资料", encoding="utf-8")
-
-    main.KNOWLEDGE_BASE_DIR = kb
+def test_api_search_returns_results(tmp_path: Path, monkeypatch):
     client = TestClient(main.app)
+    user_id, token = _create_user_and_token(client, monkeypatch, tmp_path, "alice")
 
-    r = client.get("/api/search", params={"q": "文言文"})
+    kb_root = tmp_path / "knowledge_base"
+    kb_root.mkdir(parents=True, exist_ok=True)
+    main.KNOWLEDGE_BASE_DIR = kb_root
+    (kb_root / f"u_{user_id}" / "语文").mkdir(parents=True)
+    (kb_root / f"u_{user_id}" / "语文" / "语文.md").write_text("这是文言文复习资料", encoding="utf-8")
+
+    r = client.get("/api/search", params={"q": "文言文"}, headers={"Authorization": "Bearer " + token})
     assert r.status_code == 200
     data = r.json()
     assert data["query"] == "文言文"
@@ -69,17 +83,21 @@ def test_api_daily_quote_has_required_fields():
     assert isinstance(data["summary"], str) and data["summary"]
 
 
-def test_filters_options(tmp_path: Path):
-    kb = tmp_path / "knowledge_base"
-    (kb / "语文").mkdir(parents=True)
-    (kb / "语文" / "a.md").write_text("x", encoding="utf-8")
-    (kb / "语文" / "a.md.meta.json").write_text('{"year":"2023","region":"北京","type":"中考真题"}', encoding="utf-8")
-    (kb / "数学").mkdir(parents=True)
-    (kb / "数学" / "b.txt").write_text("y", encoding="utf-8")
-
-    main.KNOWLEDGE_BASE_DIR = kb
+def test_filters_options(tmp_path: Path, monkeypatch):
     client = TestClient(main.app)
-    r = client.get("/api/filters/options")
+    user_id, token = _create_user_and_token(client, monkeypatch, tmp_path, "u1")
+
+    kb_root = tmp_path / "knowledge_base"
+    kb_root.mkdir(parents=True, exist_ok=True)
+    main.KNOWLEDGE_BASE_DIR = kb_root
+    base = kb_root / f"u_{user_id}"
+    (base / "语文").mkdir(parents=True)
+    (base / "语文" / "a.md").write_text("x", encoding="utf-8")
+    (base / "语文" / "a.md.meta.json").write_text('{"year":"2023","region":"北京","type":"中考真题"}', encoding="utf-8")
+    (base / "数学").mkdir(parents=True)
+    (base / "数学" / "b.txt").write_text("y", encoding="utf-8")
+
+    r = client.get("/api/filters/options", headers={"Authorization": "Bearer " + token})
     assert r.status_code == 200
     data = r.json()
     assert "语文" in data["categories"]
@@ -91,18 +109,22 @@ def test_filters_options(tmp_path: Path):
     assert "txt" in data["exts"]
 
 
-def test_filter_by_meta_and_ext(tmp_path: Path):
-    kb = tmp_path / "knowledge_base"
-    (kb / "语文").mkdir(parents=True)
-    (kb / "语文" / "a.md").write_text("x", encoding="utf-8")
-    (kb / "语文" / "a.md.meta.json").write_text('{"year":"2023","region":"北京","type":"中考真题"}', encoding="utf-8")
-    (kb / "语文" / "b.md").write_text("y", encoding="utf-8")
-    (kb / "数学").mkdir(parents=True)
-    (kb / "数学" / "c.txt").write_text("z", encoding="utf-8")
-
-    main.KNOWLEDGE_BASE_DIR = kb
+def test_filter_by_meta_and_ext(tmp_path: Path, monkeypatch):
     client = TestClient(main.app)
-    r = client.get("/api/filter", params={"year": "2023", "ext": "md"})
+    user_id, token = _create_user_and_token(client, monkeypatch, tmp_path, "u2")
+
+    kb_root = tmp_path / "knowledge_base"
+    kb_root.mkdir(parents=True, exist_ok=True)
+    main.KNOWLEDGE_BASE_DIR = kb_root
+    base = kb_root / f"u_{user_id}"
+    (base / "语文").mkdir(parents=True)
+    (base / "语文" / "a.md").write_text("x", encoding="utf-8")
+    (base / "语文" / "a.md.meta.json").write_text('{"year":"2023","region":"北京","type":"中考真题"}', encoding="utf-8")
+    (base / "语文" / "b.md").write_text("y", encoding="utf-8")
+    (base / "数学").mkdir(parents=True)
+    (base / "数学" / "c.txt").write_text("z", encoding="utf-8")
+
+    r = client.get("/api/filter", params={"year": "2023", "ext": "md"}, headers={"Authorization": "Bearer " + token})
     assert r.status_code == 200
     data = r.json()
     assert "语文" in data
@@ -131,10 +153,16 @@ D. 选项D
     assert items[1]["options"] == []
 
 
-def test_api_split_creates_questions_file(tmp_path: Path):
-    kb = tmp_path / "knowledge_base"
-    (kb / "语文").mkdir(parents=True)
-    (kb / "语文" / "试卷.md").write_text(
+def test_api_split_creates_questions_file(tmp_path: Path, monkeypatch):
+    client = TestClient(main.app)
+    user_id, token = _create_user_and_token(client, monkeypatch, tmp_path, "u3")
+
+    kb_root = tmp_path / "knowledge_base"
+    kb_root.mkdir(parents=True, exist_ok=True)
+    main.KNOWLEDGE_BASE_DIR = kb_root
+    base = kb_root / f"u_{user_id}"
+    (base / "语文").mkdir(parents=True)
+    (base / "语文" / "试卷.md").write_text(
         """1. 题目
 A. a
 B. b
@@ -143,19 +171,16 @@ D. d
 """,
         encoding="utf-8",
     )
-
-    main.KNOWLEDGE_BASE_DIR = kb
-    client = TestClient(main.app)
-    r = client.post("/api/split", json={"category": "语文", "filename": "试卷.md"})
+    r = client.post("/api/split", json={"category": "语文", "filename": "试卷.md"}, headers={"Authorization": "Bearer " + token})
     assert r.status_code == 200
     data = r.json()
     assert data["status"] == "success"
     assert data["count"] == 1
 
-    out = kb / "语文" / "试卷.questions.json"
+    out = base / "语文" / "试卷.questions.json"
     assert out.exists()
 
-    r2 = client.get("/api/questions/语文/试卷.questions.json")
+    r2 = client.get("/api/questions/语文/试卷.questions.json", headers={"Authorization": "Bearer " + token})
     assert r2.status_code == 200
     data2 = r2.json()
     assert data2["items"][0]["id"] == "1"

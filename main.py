@@ -8,11 +8,12 @@ import json
 import datetime as dt
 from typing import Optional
 from pathlib import Path
-from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Body
+from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Body, Depends, Header
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from zoneinfo import ZoneInfo
+import auth
 
 # Additional imports for new features
 try:
@@ -66,6 +67,15 @@ KNOWLEDGE_BASE_DIR.mkdir(parents=True, exist_ok=True)
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+def user_kb_dir(user_id: int) -> Path:
+    d = KNOWLEDGE_BASE_DIR / f"u_{user_id}"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+def validate_path_segment(value: str, field: str):
+    if not value or ".." in value or "/" in value or "\\" in value:
+        raise HTTPException(status_code=400, detail=f"非法参数: {field}")
 
 SUBJECT_KEYWORDS = {
     "语文": ["语文", "阅读", "作文", "古诗", "文言文", "chinese"],
@@ -242,9 +252,8 @@ def get_file_md5(file_path: Path) -> str:
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
 
-def is_duplicate(file_md5: str) -> bool:
-    """Feature 5: 智能去重。检查是否已经存在相同MD5的文件。"""
-    for meta_file in KNOWLEDGE_BASE_DIR.rglob("*.meta.json"):
+def is_duplicate(file_md5: str, kb_dir: Path) -> bool:
+    for meta_file in kb_dir.rglob("*.meta.json"):
         try:
             with open(meta_file, 'r', encoding='utf-8') as f:
                 meta = json.load(f)
@@ -376,12 +385,12 @@ def chunk_text(text: str) -> str:
     chunked = re.sub(r'\n([一二三四五六七八九十]、)', r'\n\n---\n\n\1', text)
     return chunked
 
-def process_single_file(file_path: Path, original_filename: str) -> dict:
+def process_single_file(file_path: Path, original_filename: str, kb_dir: Path) -> dict:
     """处理单个文件：去重、提取文本、分类、转Markdown、切块、提取元数据并移动到对应目录"""
     
     # 1. 查重
     file_md5 = get_file_md5(file_path)
-    if is_duplicate(file_md5):
+    if is_duplicate(file_md5, kb_dir):
         return {"status": "skipped", "filename": original_filename, "message": "文件已存在 (MD5重复)"}
     
     # 2. 提取文本
@@ -389,7 +398,7 @@ def process_single_file(file_path: Path, original_filename: str) -> dict:
     
     # 3. 分类
     category = classify_file(original_filename, text_content[:1000])
-    category_dir = KNOWLEDGE_BASE_DIR / category
+    category_dir = kb_dir / category
     category_dir.mkdir(exist_ok=True)
     
     # 4. 格式转换与切块
@@ -443,10 +452,56 @@ def process_single_file(file_path: Path, original_filename: str) -> dict:
 async def get_index():
     return RedirectResponse(url="https://zhongkao-kb.pages.dev/", status_code=302)
 
+@app.post("/api/auth/register")
+async def register(payload: dict = Body(...)):
+    invite = (payload.get("invite_code") or "").strip()
+    username = (payload.get("username") or "").strip()
+    password = payload.get("password") or ""
+    code = (os.getenv("INVITE_CODE") or "").strip()
+    if not code:
+        raise HTTPException(status_code=503, detail="未配置 INVITE_CODE")
+    if not invite or invite != code:
+        raise HTTPException(status_code=403, detail="邀请码错误")
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="缺少用户名或密码")
+    user = auth.create_user(username=username, password=password)
+    return {"status": "success", "user": {"id": user.id, "username": user.username}}
+
+
+@app.post("/api/auth/login")
+async def login(payload: dict = Body(...)):
+    username = (payload.get("username") or "").strip()
+    password = payload.get("password") or ""
+    user = auth.verify_user(username=username, password=password)
+    if not user:
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
+    token = auth.create_session(user_id=user.id)
+    return {"status": "success", "token": token, "user": {"id": user.id, "username": user.username}}
+
+
+@app.post("/api/auth/logout")
+async def logout(
+    current_user: auth.User = Depends(auth.get_current_user),
+    authorization: Optional[str] = Header(None),
+):
+    token = auth.parse_bearer(authorization)
+    if token:
+        auth.delete_session(token)
+    return {"status": "success"}
+
+
+@app.get("/api/auth/me")
+async def me(current_user: auth.User = Depends(auth.get_current_user)):
+    return {"id": current_user.id, "username": current_user.username}
+
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(
+    file: UploadFile = File(...),
+    current_user: auth.User = Depends(auth.get_current_user),
+):
     results = []
     try:
+        kb_dir = user_kb_dir(current_user.id)
         # Create a temporary directory to save the uploaded file
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_dir_path = Path(temp_dir)
@@ -465,13 +520,13 @@ async def upload_file(file: UploadFile = File(...)):
                         
                         for extracted_file in extract_dir.rglob("*"):
                             if extracted_file.is_file() and not extracted_file.name.startswith('.'):
-                                res = process_single_file(extracted_file, extracted_file.name)
+                                res = process_single_file(extracted_file, extracted_file.name, kb_dir)
                                 results.append(res)
                 except zipfile.BadZipFile:
                     return JSONResponse({"status": "error", "message": "无效的ZIP文件"}, status_code=400)
             else:
                 # 处理单文件
-                res = process_single_file(temp_file_path, file.filename)
+                res = process_single_file(temp_file_path, file.filename, kb_dir)
                 results.append(res)
                 
         return JSONResponse({"status": "success", "results": results})
@@ -479,10 +534,11 @@ async def upload_file(file: UploadFile = File(...)):
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 @app.get("/api/stats")
-async def get_stats():
+async def get_stats(current_user: auth.User = Depends(auth.get_current_user)):
     """Returns the current state of the knowledge base for display."""
     stats = {}
-    for item in KNOWLEDGE_BASE_DIR.iterdir():
+    kb_dir = user_kb_dir(current_user.id)
+    for item in kb_dir.iterdir():
         if item.is_dir():
             files = []
             for f in item.iterdir():
@@ -501,9 +557,11 @@ async def api_search(
     category: Optional[str] = Query(None),
     limit: int = Query(20, ge=1, le=50),
     context: int = Query(60, ge=10, le=200),
+    current_user: auth.User = Depends(auth.get_current_user),
 ):
+    kb_dir = user_kb_dir(current_user.id)
     return search_knowledge_base(
-        base_dir=KNOWLEDGE_BASE_DIR,
+        base_dir=kb_dir,
         q=q,
         category=category,
         limit=limit,
@@ -564,8 +622,9 @@ async def get_daily_quote():
     return {"date": date_str, **q}
 
 @app.get("/api/filters/options")
-async def get_filter_options():
-    categories = sorted([p.name for p in KNOWLEDGE_BASE_DIR.iterdir() if p.is_dir()])
+async def get_filter_options(current_user: auth.User = Depends(auth.get_current_user)):
+    kb_dir = user_kb_dir(current_user.id)
+    categories = sorted([p.name for p in kb_dir.iterdir() if p.is_dir()])
 
     exts = set()
     years = set()
@@ -573,7 +632,7 @@ async def get_filter_options():
     types = set()
 
     for cat in categories:
-        d = KNOWLEDGE_BASE_DIR / cat
+        d = kb_dir / cat
         for f in d.iterdir():
             if not f.is_file():
                 continue
@@ -615,12 +674,14 @@ async def filter_files(
     region: Optional[str] = Query(None),
     type: Optional[str] = Query(None),
     ext: Optional[str] = Query(None),
+    current_user: auth.User = Depends(auth.get_current_user),
 ):
     ext_norm = (ext or "").strip().lower().lstrip(".") or None
     need_meta = any([(year or "").strip(), (region or "").strip(), (type or "").strip()])
 
     stats = {}
-    for cat, f in _iter_target_files(KNOWLEDGE_BASE_DIR, category):
+    kb_dir = user_kb_dir(current_user.id)
+    for cat, f in _iter_target_files(kb_dir, category):
         if ext_norm and f.suffix.lower().lstrip(".") != ext_norm:
             continue
 
@@ -651,13 +712,19 @@ async def filter_files(
     return stats
 
 @app.post("/api/split")
-async def split_file(payload: dict = Body(...)):
+async def split_file(
+    payload: dict = Body(...),
+    current_user: auth.User = Depends(auth.get_current_user),
+):
     category = (payload.get("category") or "").strip()
     filename = (payload.get("filename") or "").strip()
+    validate_path_segment(category, "category")
+    validate_path_segment(filename, "filename")
     if not category or not filename:
         raise HTTPException(status_code=400, detail="缺少 category 或 filename")
 
-    file_path = KNOWLEDGE_BASE_DIR / category / filename
+    kb_dir = user_kb_dir(current_user.id)
+    file_path = kb_dir / category / filename
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="文件不存在")
 
@@ -687,8 +754,15 @@ async def split_file(payload: dict = Body(...)):
     }
 
 @app.get("/api/questions/{category}/{filename}")
-async def get_questions(category: str, filename: str):
-    file_path = KNOWLEDGE_BASE_DIR / category / filename
+async def get_questions(
+    category: str,
+    filename: str,
+    current_user: auth.User = Depends(auth.get_current_user),
+):
+    validate_path_segment(category, "category")
+    validate_path_segment(filename, "filename")
+    kb_dir = user_kb_dir(current_user.id)
+    file_path = kb_dir / category / filename
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="文件不存在")
     if not filename.endswith(".questions.json"):
@@ -699,11 +773,10 @@ async def get_questions(category: str, filename: str):
         raise HTTPException(status_code=500, detail="JSON 解析失败")
 
 @app.delete("/api/clear")
-async def clear_knowledge_base():
+async def clear_knowledge_base(current_user: auth.User = Depends(auth.get_current_user)):
     try:
-        for item in KNOWLEDGE_BASE_DIR.iterdir():
-            if item.name == ".gitkeep":
-                continue
+        kb_dir = user_kb_dir(current_user.id)
+        for item in kb_dir.iterdir():
             if item.is_dir():
                 shutil.rmtree(item)
             else:
@@ -714,8 +787,15 @@ async def clear_knowledge_base():
 
 # Feature 7: 在线文件预览
 @app.get("/api/file/{category}/{filename}")
-async def get_file_content(category: str, filename: str):
-    file_path = KNOWLEDGE_BASE_DIR / category / filename
+async def get_file_content(
+    category: str,
+    filename: str,
+    current_user: auth.User = Depends(auth.get_current_user),
+):
+    validate_path_segment(category, "category")
+    validate_path_segment(filename, "filename")
+    kb_dir = user_kb_dir(current_user.id)
+    file_path = kb_dir / category / filename
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="文件不存在")
         
@@ -728,8 +808,15 @@ async def get_file_content(category: str, filename: str):
 
 # Feature 7: 在线文件删除
 @app.delete("/api/file/{category}/{filename}")
-async def delete_file(category: str, filename: str):
-    file_path = KNOWLEDGE_BASE_DIR / category / filename
+async def delete_file(
+    category: str,
+    filename: str,
+    current_user: auth.User = Depends(auth.get_current_user),
+):
+    validate_path_segment(category, "category")
+    validate_path_segment(filename, "filename")
+    kb_dir = user_kb_dir(current_user.id)
+    file_path = kb_dir / category / filename
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="文件不存在")
         

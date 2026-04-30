@@ -16,6 +16,13 @@
       <div id="daily-quote" class="text-gray-500 text-sm"></div>
     </header>
 
+    <div class="flex items-center justify-end mb-4">
+      <div id="user-bar" class="hidden text-sm text-gray-600">
+        <span id="current-user" class="font-medium text-gray-800"></span>
+        <button id="logoutBtn" class="ml-3 text-red-500 hover:text-red-700">退出</button>
+      </div>
+    </div>
+
     <main class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <section class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <h2 class="text-xl font-semibold mb-4 flex items-center">
@@ -111,6 +118,42 @@
     </div>
   </div>
 
+  <div id="auth-modal" class="fixed inset-0 z-50 hidden bg-gray-900 bg-opacity-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-lg w-full max-w-md">
+      <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+        <div class="text-lg font-semibold text-gray-800">登录 / 注册</div>
+        <button id="closeAuth" class="text-gray-400 hover:text-gray-600 focus:outline-none">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <div class="p-4">
+        <div class="flex gap-2 mb-4">
+          <button id="tabLogin" class="flex-1 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm">登录</button>
+          <button id="tabRegister" class="flex-1 px-3 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm">注册</button>
+        </div>
+
+        <div id="login-panel">
+          <div class="space-y-3">
+            <input id="loginUsername" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="用户名">
+            <input id="loginPassword" type="password" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="密码">
+            <button id="loginBtn" class="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">登录</button>
+          </div>
+        </div>
+
+        <div id="register-panel" class="hidden">
+          <div class="space-y-3">
+            <input id="inviteCode" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="邀请码">
+            <input id="registerUsername" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="用户名">
+            <input id="registerPassword" type="password" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="密码">
+            <button id="registerBtn" class="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">注册</button>
+          </div>
+        </div>
+
+        <div id="auth-msg" class="mt-4 text-sm"></div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const dropZone = document.getElementById('drop-zone')
     const fileInput = document.getElementById('file-upload')
@@ -136,6 +179,23 @@
     const modalTitle = document.getElementById('modal-title')
     const modalContent = document.getElementById('modal-content')
     const closePreviewBtn = document.getElementById('closePreview')
+    const authModal = document.getElementById('auth-modal')
+    const closeAuthBtn = document.getElementById('closeAuth')
+    const tabLoginBtn = document.getElementById('tabLogin')
+    const tabRegisterBtn = document.getElementById('tabRegister')
+    const loginPanel = document.getElementById('login-panel')
+    const registerPanel = document.getElementById('register-panel')
+    const authMsg = document.getElementById('auth-msg')
+    const loginUsername = document.getElementById('loginUsername')
+    const loginPassword = document.getElementById('loginPassword')
+    const loginBtn = document.getElementById('loginBtn')
+    const inviteCode = document.getElementById('inviteCode')
+    const registerUsername = document.getElementById('registerUsername')
+    const registerPassword = document.getElementById('registerPassword')
+    const registerBtn = document.getElementById('registerBtn')
+    const userBar = document.getElementById('user-bar')
+    const currentUserEl = document.getElementById('current-user')
+    const logoutBtn = document.getElementById('logoutBtn')
 
     const MAX_BATCH_FILES = 50
     const UPLOAD_CONCURRENCY = 3
@@ -143,7 +203,64 @@
     let activeUploads = 0
     const API_BASE = 'https://hmingbo-zhongkao-kb-api.hf.space'
     const QUOTE_CACHE_KEY = 'ZKKB_DAILY_QUOTE'
+    const TOKEN_KEY = 'ZKKB_TOKEN'
     let filterActive = false
+
+    function getToken() { return localStorage.getItem(TOKEN_KEY) || '' }
+    function setToken(t) { localStorage.setItem(TOKEN_KEY, t) }
+    function clearToken() { localStorage.removeItem(TOKEN_KEY) }
+
+    function renderUserBar(user) {
+      if (user && user.username) {
+        userBar.classList.remove('hidden')
+        currentUserEl.textContent = user.username
+        return
+      }
+      userBar.classList.add('hidden')
+      currentUserEl.textContent = ''
+    }
+
+    function setAuthMsg(text, ok) {
+      authMsg.className = ok ? 'mt-4 text-sm text-green-700' : 'mt-4 text-sm text-red-700'
+      authMsg.textContent = text
+    }
+
+    function showAuthModal() {
+      authModal.classList.remove('hidden')
+      setAuthTab(true)
+    }
+
+    function hideAuthModal() {
+      authModal.classList.add('hidden')
+      setAuthMsg('', true)
+    }
+
+    function setAuthTab(isLogin) {
+      if (isLogin) {
+        tabLoginBtn.className = 'flex-1 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm'
+        tabRegisterBtn.className = 'flex-1 px-3 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm'
+        loginPanel.classList.remove('hidden')
+        registerPanel.classList.add('hidden')
+      } else {
+        tabLoginBtn.className = 'flex-1 px-3 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm'
+        tabRegisterBtn.className = 'flex-1 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm'
+        loginPanel.classList.add('hidden')
+        registerPanel.classList.remove('hidden')
+      }
+    }
+
+    async function apiFetch(path, opts) {
+      const headers = Object.assign({}, (opts && opts.headers) || {})
+      const token = getToken()
+      if (token) headers['Authorization'] = 'Bearer ' + token
+      const res = await fetch(API_BASE + path, Object.assign({}, opts || {}, { headers }))
+      if (res.status === 401) {
+        clearToken()
+        renderUserBar(null)
+        showAuthModal()
+      }
+      return res
+    }
 
     function getApiBase() {
       return API_BASE
@@ -318,7 +435,7 @@
       formData.append('file', item.file)
 
       try {
-        const response = await fetch(base + '/upload', { method: 'POST', body: formData })
+        const response = await apiFetch('/upload', { method: 'POST', body: formData })
         const data = await response.json().catch(() => ({}))
         if (response.ok && data.status === 'success') {
           const first = (data.results || [])[0] || {}
@@ -360,7 +477,7 @@
         return
       }
       try {
-        const response = await fetch(base + '/api/stats')
+        const response = await apiFetch('/api/stats')
         const data = await response.json()
         await loadFilterOptions()
         if (!data || Object.keys(data).length === 0) {
@@ -407,7 +524,7 @@
     async function loadFilterOptions() {
       const base = getApiBase()
       try {
-        const r = await fetch(base + '/api/filters/options')
+        const r = await apiFetch('/api/filters/options')
         const data = await r.json().catch(() => ({}))
         if (!r.ok) return
 
@@ -450,7 +567,7 @@
       if (ext) params.set('ext', ext)
 
       try {
-        const r = await fetch(base + '/api/filter?' + params.toString())
+        const r = await apiFetch('/api/filter?' + params.toString())
         const data = await r.json().catch(() => ({}))
         if (!r.ok) {
           kbStats.innerHTML = `<p class="text-red-500 text-sm">筛选失败: ${escapeHtml((data && data.message) || String(r.status))}</p>`
@@ -525,7 +642,7 @@
       const params = new URLSearchParams({ q })
       if (category) params.set('category', category)
       try {
-        const r = await fetch(base + '/api/search?' + params.toString())
+        const r = await apiFetch('/api/search?' + params.toString())
         const data = await r.json().catch(() => ({}))
         if (!r.ok) {
           searchResults.classList.remove('hidden')
@@ -604,8 +721,8 @@
     async function previewFile(category, filename) {
       const base = getApiBase()
       try {
-        const url = base + '/api/file/' + encodeURIComponent(category) + '/' + encodeURIComponent(filename)
-        const response = await fetch(url)
+        const url = '/api/file/' + encodeURIComponent(category) + '/' + encodeURIComponent(filename)
+        const response = await apiFetch(url)
         const data = await response.json()
         if (!response.ok) {
           alert('预览失败: ' + (data && data.detail ? data.detail : String(response.status)))
@@ -626,7 +743,7 @@
     async function splitFile(category, filename) {
       const base = getApiBase()
       try {
-        const r = await fetch(base + '/api/split', {
+        const r = await apiFetch('/api/split', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ category, filename }),
@@ -643,8 +760,8 @@
           else await loadStats()
         }
 
-        const qUrl = base + '/api/questions/' + encodeURIComponent(category) + '/' + encodeURIComponent(outName)
-        const r2 = await fetch(qUrl)
+        const qUrl = '/api/questions/' + encodeURIComponent(category) + '/' + encodeURIComponent(outName)
+        const r2 = await apiFetch(qUrl)
         const qData = await r2.json().catch(() => ({}))
         if (!r2.ok) {
           alert('获取拆题结果失败: ' + escapeHtml((qData && qData.detail) || String(r2.status)))
@@ -686,8 +803,8 @@
       const base = getApiBase()
       if (!confirm(`确定要删除文件 "${filename}" 吗？`)) return
       try {
-        const url = base + '/api/file/' + encodeURIComponent(category) + '/' + encodeURIComponent(filename)
-        const response = await fetch(url, { method: 'DELETE' })
+        const url = '/api/file/' + encodeURIComponent(category) + '/' + encodeURIComponent(filename)
+        const response = await apiFetch(url, { method: 'DELETE' })
         const data = await response.json().catch(() => ({}))
         if (response.ok && data.status === 'success') {
           if (filterActive) await applyFilters()
@@ -708,12 +825,72 @@
     searchQueryInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch() })
     applyFiltersBtn.addEventListener('click', applyFilters)
     clearFiltersBtn.addEventListener('click', clearFilters)
+    tabLoginBtn.addEventListener('click', () => setAuthTab(true))
+    tabRegisterBtn.addEventListener('click', () => setAuthTab(false))
+    closeAuthBtn.addEventListener('click', hideAuthModal)
+    authModal.addEventListener('click', (e) => { if (e.target === authModal) hideAuthModal() })
+
+    loginBtn.addEventListener('click', async () => {
+      const username = (loginUsername.value || '').trim()
+      const password = loginPassword.value || ''
+      if (!username || !password) { setAuthMsg('请输入用户名和密码。', false); return }
+      try {
+        const r = await fetch(API_BASE + '/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        })
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok || data.status !== 'success') {
+          setAuthMsg((data && data.detail) || '登录失败', false)
+          return
+        }
+        setToken(data.token)
+        renderUserBar(data.user)
+        hideAuthModal()
+        await loadStats()
+      } catch (e) {
+        setAuthMsg('登录失败', false)
+      }
+    })
+
+    registerBtn.addEventListener('click', async () => {
+      const invite_code = (inviteCode.value || '').trim()
+      const username = (registerUsername.value || '').trim()
+      const password = registerPassword.value || ''
+      if (!invite_code || !username || !password) { setAuthMsg('请输入邀请码、用户名和密码。', false); return }
+      try {
+        const r = await fetch(API_BASE + '/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ invite_code, username, password }),
+        })
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok || data.status !== 'success') {
+          setAuthMsg((data && data.detail) || '注册失败', false)
+          return
+        }
+        setAuthMsg('注册成功，请登录。', true)
+        setAuthTab(true)
+        loginUsername.value = username
+        loginPassword.value = ''
+      } catch (e) {
+        setAuthMsg('注册失败', false)
+      }
+    })
+
+    logoutBtn.addEventListener('click', async () => {
+      try { await apiFetch('/api/auth/logout', { method: 'POST' }) } catch (e) {}
+      clearToken()
+      renderUserBar(null)
+      showAuthModal()
+    })
     clearBtn.addEventListener('click', async () => {
       const base = getApiBase()
       if (!base) return
       if (!confirm('确定要清空知识库吗？')) return
       try {
-        const r = await fetch(base + '/api/clear', { method: 'DELETE' })
+        const r = await apiFetch('/api/clear', { method: 'DELETE' })
         const data = await r.json().catch(() => ({}))
         if (r.ok && data.status === 'success') {
           showStatus('知识库已清空。', true)
@@ -731,7 +908,26 @@
     })
 
     loadDailyQuote()
-    loadStats()
+
+    ;(async () => {
+      const token = getToken()
+      if (!token) {
+        showAuthModal()
+        return
+      }
+      try {
+        const r = await apiFetch('/api/auth/me')
+        const data = await r.json().catch(() => ({}))
+        if (r.ok && data && data.username) {
+          renderUserBar(data)
+          await loadStats()
+          return
+        }
+      } catch (e) {}
+      clearToken()
+      renderUserBar(null)
+      showAuthModal()
+    })()
   </script>
 </body>
 </html>
