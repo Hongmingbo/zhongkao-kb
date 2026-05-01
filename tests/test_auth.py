@@ -366,3 +366,40 @@ def test_meta_batch_update_creates_and_merges(tmp_path: Path, monkeypatch):
     assert meta2["year"] == "2024"
     assert meta2["type"] == "真题"
     assert meta2["region"] == "北京"
+
+
+def test_file_rename_and_meta_rename(tmp_path: Path, monkeypatch):
+    db_path = tmp_path / "app.db"
+    monkeypatch.setenv("APP_DB_PATH", str(db_path))
+    monkeypatch.setenv("INVITE_CODE", "abc123")
+    client = TestClient(main.app)
+
+    client.post("/api/auth/register", json={"invite_code": "abc123", "username": "u1", "password": "pw"})
+    token = client.post("/api/auth/login", json={"username": "u1", "password": "pw"}).json()["token"]
+
+    kb_root = tmp_path / "kb"
+    kb_root.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(main, "KNOWLEDGE_BASE_DIR", kb_root)
+
+    cat_dir = kb_root / "u_1" / "英语"
+    cat_dir.mkdir(parents=True, exist_ok=True)
+    (cat_dir / "a.md").write_text("x", encoding="utf-8")
+    (cat_dir / "a.md.meta.json").write_text('{"year":"2024"}', encoding="utf-8")
+    (cat_dir / "b.md").write_text("y", encoding="utf-8")
+
+    r = client.post(
+        "/api/file/rename",
+        json={"category": "英语", "old_filename": "a.md", "new_filename": "b.md"},
+        headers={"Authorization": "Bearer " + token},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["status"] == "success"
+    new_name = data["new_filename"]
+    assert new_name != ""
+    assert new_name != "a.md"
+
+    assert not (cat_dir / "a.md").exists()
+    assert not (cat_dir / "a.md.meta.json").exists()
+    assert (cat_dir / new_name).exists()
+    assert (cat_dir / (new_name + ".meta.json")).exists()

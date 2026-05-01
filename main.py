@@ -164,6 +164,49 @@ def _unique_move_name(dest_dir: Path, filename: str) -> str:
         i += 1
 
 
+def _unique_rename_name(dest_dir: Path, filename: str) -> str:
+    if not (dest_dir / filename).exists():
+        return filename
+    stem = Path(filename).stem
+    suffix = "".join(Path(filename).suffixes)
+    ts = dt.datetime.now(dt.UTC).strftime("%Y%m%d%H%M%S")
+    candidate = f"{stem}-renamed-{ts}{suffix}"
+    if not (dest_dir / candidate).exists():
+        return candidate
+    i = 2
+    while True:
+        c = f"{stem}-renamed-{ts}-{i}{suffix}"
+        if not (dest_dir / c).exists():
+            return c
+        i += 1
+
+
+def _rename_kb_file(user_id: int, category: str, old_filename: str, new_filename: str) -> dict:
+    validate_path_segment(category, "category")
+    validate_path_segment(old_filename, "old_filename")
+    validate_path_segment(new_filename, "new_filename")
+    if category.startswith("_"):
+        raise HTTPException(status_code=400, detail="不支持操作系统目录")
+    if old_filename == new_filename:
+        return {"category": category, "old_filename": old_filename, "new_filename": new_filename}
+
+    kb_dir = user_kb_dir(user_id)
+    d = kb_dir / category
+    src = d / old_filename
+    if not src.exists() or not src.is_file():
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    final_name = _unique_rename_name(d, new_filename)
+    dest = d / final_name
+
+    shutil.move(str(src), str(dest))
+    src_meta = src.with_name(src.name + ".meta.json")
+    if src_meta.exists():
+        dest_meta = dest.with_name(dest.name + ".meta.json")
+        shutil.move(str(src_meta), str(dest_meta))
+    return {"category": category, "old_filename": old_filename, "new_filename": final_name}
+
+
 def _move_kb_file(user_id: int, category: str, filename: str, target_category: str) -> dict:
     validate_path_segment(category, "category")
     validate_path_segment(target_category, "target_category")
@@ -1166,6 +1209,17 @@ async def batch_move_files(payload: dict = Body(...), current_user: auth.User = 
         except Exception as e:
             results.append({"ok": False, "category": category, "filename": filename, "error": str(e)})
     return {"status": "success", "results": results}
+
+
+@app.post("/api/file/rename")
+async def rename_file(payload: dict = Body(...), current_user: auth.User = Depends(auth.get_current_user)):
+    category = (payload.get("category") or "").strip()
+    old_filename = (payload.get("old_filename") or "").strip()
+    new_filename = (payload.get("new_filename") or "").strip()
+    if not category or not old_filename or not new_filename:
+        raise HTTPException(status_code=400, detail="参数不完整")
+    r = _rename_kb_file(current_user.id, category, old_filename, new_filename)
+    return {"status": "success", "new_filename": r["new_filename"]}
 
 
 @app.get("/api/trash")
