@@ -94,6 +94,13 @@
         <div id="kb-stats" class="space-y-4 max-h-[420px] overflow-y-auto">
           <p class="text-gray-500 text-sm">加载中...</p>
         </div>
+        <div id="bulk-bar" class="hidden mt-4 p-3 rounded-lg border border-blue-100 bg-blue-50 flex items-center justify-between gap-2">
+          <div class="text-sm text-blue-900"><span id="bulk-count">已选择 0 个</span></div>
+          <div class="flex gap-2">
+            <button id="bulkCancelBtn" class="px-3 py-2 rounded-lg bg-white text-gray-800 text-sm border border-gray-200 hover:bg-gray-50">取消选择</button>
+            <button id="bulkTrashBtn" class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">批量移入回收站</button>
+          </div>
+        </div>
         <div class="flex gap-4 mt-4">
           <button id="refreshBtn" class="text-sm text-blue-500 hover:text-blue-700 flex items-center">
             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
@@ -122,7 +129,12 @@
       </div>
       <div class="p-4 border-b border-gray-100 flex items-center justify-between gap-2">
         <div class="text-sm text-gray-600" id="trash-count">加载中...</div>
-        <button id="clearTrashBtn" class="px-3 py-2 rounded-lg bg-red-600 text-white text-sm hover:bg-red-700">清空回收站</button>
+        <div class="flex gap-2">
+          <button id="trashRestoreSelectedBtn" class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">恢复已选</button>
+          <button id="trashPurgeSelectedBtn" class="px-3 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm hover:bg-gray-200">删除已选</button>
+          <button id="trashClearSelectedBtn" class="px-3 py-2 rounded-lg bg-white text-gray-800 text-sm border border-gray-200 hover:bg-gray-50">取消选择</button>
+          <button id="clearTrashBtn" class="px-3 py-2 rounded-lg bg-red-600 text-white text-sm hover:bg-red-700">清空回收站</button>
+        </div>
       </div>
       <div id="trash-list" class="p-4 overflow-y-auto flex-1"></div>
     </div>
@@ -231,6 +243,10 @@
     const refreshBtn = document.getElementById('refreshBtn')
     const trashBtn = document.getElementById('trashBtn')
     const clearBtn = document.getElementById('clearBtn')
+    const bulkBar = document.getElementById('bulk-bar')
+    const bulkCount = document.getElementById('bulk-count')
+    const bulkCancelBtn = document.getElementById('bulkCancelBtn')
+    const bulkTrashBtn = document.getElementById('bulkTrashBtn')
     const searchQueryInput = document.getElementById('searchQuery')
     const searchCategorySelect = document.getElementById('searchCategory')
     const searchBtn = document.getElementById('searchBtn')
@@ -279,6 +295,9 @@
     const trashList = document.getElementById('trash-list')
     const trashCount = document.getElementById('trash-count')
     const clearTrashBtn = document.getElementById('clearTrashBtn')
+    const trashRestoreSelectedBtn = document.getElementById('trashRestoreSelectedBtn')
+    const trashPurgeSelectedBtn = document.getElementById('trashPurgeSelectedBtn')
+    const trashClearSelectedBtn = document.getElementById('trashClearSelectedBtn')
     const oldPasswordInput = document.getElementById('oldPasswordInput')
     const newPasswordInput = document.getElementById('newPasswordInput')
     const newPassword2Input = document.getElementById('newPassword2Input')
@@ -298,6 +317,33 @@
     function clearToken() { localStorage.removeItem(TOKEN_KEY) }
 
     let avatarObjectUrl = ''
+    const selectedKb = new Set()
+    const selectedTrash = new Set()
+
+    function updateBulkBar() {
+      const n = selectedKb.size
+      if (!n) {
+        bulkBar.classList.add('hidden')
+        bulkCount.textContent = '已选择 0 个'
+        return
+      }
+      bulkBar.classList.remove('hidden')
+      bulkCount.textContent = `已选择 ${n} 个`
+    }
+
+    function updateTrashHeader() {
+      const base = '回收站'
+      const n = selectedTrash.size
+      if (trashCount.textContent && trashCount.textContent.startsWith(base)) {
+        trashCount.textContent = `${base}（已选 ${n}）`
+        return
+      }
+      if (trashCount.textContent && trashCount.textContent.includes('已选')) {
+        const rest = trashCount.textContent.split('（')[0]
+        trashCount.textContent = `${rest}（已选 ${n}）`
+        return
+      }
+    }
 
     function renderUserBar(user) {
       if (user && user.username) {
@@ -614,7 +660,7 @@
         const r = await apiFetch('/api/trash')
         const data = await r.json().catch(() => ({}))
         const items = Array.isArray(data.items) ? data.items : []
-        trashCount.textContent = `共 ${items.length} 个条目`
+        trashCount.textContent = `共 ${items.length} 个条目（已选 ${selectedTrash.size}）`
         if (!items.length) {
           trashList.innerHTML = '<p class="text-sm text-gray-500 text-center py-10">回收站为空</p>'
           return
@@ -623,9 +669,12 @@
           <div class="space-y-2">
             ${items.map(it => `
               <div class="p-3 rounded-lg border border-gray-200 bg-white flex items-center justify-between gap-3">
-                <div class="min-w-0">
-                  <div class="text-sm font-medium text-gray-800 truncate" title="${escapeHtml(it.filename || '')}">${escapeHtml(it.filename || '')}</div>
+                <div class="min-w-0 flex items-start gap-3">
+                  <input type="checkbox" class="mt-1 h-4 w-4" data-trash-select="1" data-id="${escapeAttr(it.id || '')}" ${selectedTrash.has(it.id) ? 'checked' : ''}>
+                  <div class="min-w-0">
+                    <div class="text-sm font-medium text-gray-800 truncate" title="${escapeHtml(it.filename || '')}">${escapeHtml(it.filename || '')}</div>
                   <div class="text-xs text-gray-500 mt-1">原位置：${escapeHtml(it.category || '')} · 删除时间：${escapeHtml(formatTime(it.deleted_at))}</div>
+                  </div>
                 </div>
                 <div class="flex gap-2 shrink-0">
                   <button class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs hover:bg-blue-700" data-action="trash-restore" data-id="${escapeAttr(it.id || '')}">恢复</button>
@@ -718,9 +767,12 @@
                   const n = String(f.name || '')
                   const lower = n.toLowerCase()
                   const canSplit = !lower.endsWith('.questions.json') && (lower.endsWith('.md') || lower.endsWith('.txt') || lower.endsWith('.csv'))
+                  const key = category + '::' + n
+                  const checked = selectedKb.has(key) ? 'checked' : ''
                   return `
                   <li class="text-sm text-gray-600 flex items-center justify-between group">
                     <div class="flex items-center before:content-[''] before:w-2 before:h-[1px] before:bg-gray-300 before:mr-2 before:-ml-5">
+                      <input type="checkbox" class="mr-2 h-4 w-4" data-kb-select="1" data-key="${escapeAttr(key)}" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(n)}" ${checked}>
                       <span class="truncate max-w-[220px]" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
                       ${f.has_meta ? '<span class="ml-2 px-1.5 py-0.5 text-[10px] bg-blue-50 text-blue-500 rounded border border-blue-100">已提取标签</span>' : ''}
                     </div>
@@ -737,6 +789,7 @@
           `
         }
         kbStats.innerHTML = html
+        updateBulkBar()
       } catch (error) {
         kbStats.innerHTML = `<p class="text-red-500 text-sm">加载失败: ${escapeHtml(error && error.message ? error.message : String(error))}</p>`
       }
@@ -930,6 +983,16 @@
       if (action === 'delete') await deleteFile(category, filename)
     })
 
+    kbStats.addEventListener('change', (e) => {
+      const el = e.target
+      if (!el || el.getAttribute('data-kb-select') !== '1') return
+      const key = el.getAttribute('data-key') || ''
+      if (!key) return
+      if (el.checked) selectedKb.add(key)
+      else selectedKb.delete(key)
+      updateBulkBar()
+    })
+
     trashList.addEventListener('click', async (e) => {
       const btn = e.target.closest('button')
       if (!btn) return
@@ -938,6 +1001,16 @@
       if (!action || !id) return
       if (action === 'trash-restore') await restoreTrash(id)
       if (action === 'trash-delete') await deleteTrash(id)
+    })
+
+    trashList.addEventListener('change', (e) => {
+      const el = e.target
+      if (!el || el.getAttribute('data-trash-select') !== '1') return
+      const id = el.getAttribute('data-id') || ''
+      if (!id) return
+      if (el.checked) selectedTrash.add(id)
+      else selectedTrash.delete(id)
+      void loadTrash()
     })
 
     searchResults.addEventListener('click', async (e) => {
@@ -1056,6 +1129,89 @@
     closeTrashBtn.addEventListener('click', hideTrashModal)
     trashModal.addEventListener('click', (e) => { if (e.target === trashModal) hideTrashModal() })
     clearTrashBtn.addEventListener('click', clearTrashAll)
+    bulkCancelBtn.addEventListener('click', () => { selectedKb.clear(); updateBulkBar(); void loadStats() })
+    bulkTrashBtn.addEventListener('click', async () => {
+      if (!selectedKb.size) return
+      if (!confirm(`确定将已选择的 ${selectedKb.size} 个文件移入回收站吗？`)) return
+      const items = Array.from(selectedKb).map(k => {
+        const parts = k.split('::')
+        return { category: parts[0] || '', filename: parts.slice(1).join('::') || '' }
+      })
+      try {
+        const r = await apiFetch('/api/trash/batch_delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items }),
+        })
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok || data.status !== 'success') {
+          alert((data && data.detail) || '批量操作失败')
+          return
+        }
+        const results = Array.isArray(data.results) ? data.results : []
+        const okCount = results.filter(x => x && x.ok).length
+        const failCount = results.length - okCount
+        alert(`已移入回收站：${okCount}，失败：${failCount}`)
+        selectedKb.clear()
+        updateBulkBar()
+        if (filterActive) await applyFilters()
+        else await loadStats()
+      } catch (e) {
+        alert('批量操作失败')
+      }
+    })
+    trashClearSelectedBtn.addEventListener('click', () => { selectedTrash.clear(); void loadTrash() })
+    trashRestoreSelectedBtn.addEventListener('click', async () => {
+      if (!selectedTrash.size) return
+      const ids = Array.from(selectedTrash)
+      try {
+        const r = await apiFetch('/api/trash/batch_restore', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids }),
+        })
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok || data.status !== 'success') {
+          alert((data && data.detail) || '批量恢复失败')
+          return
+        }
+        const results = Array.isArray(data.results) ? data.results : []
+        const okCount = results.filter(x => x && x.ok).length
+        const failCount = results.length - okCount
+        alert(`已恢复：${okCount}，失败：${failCount}`)
+        selectedTrash.clear()
+        await loadTrash()
+        if (filterActive) await applyFilters()
+        else await loadStats()
+      } catch (e) {
+        alert('批量恢复失败')
+      }
+    })
+    trashPurgeSelectedBtn.addEventListener('click', async () => {
+      if (!selectedTrash.size) return
+      if (!confirm('确定彻底删除已选文件吗？此操作不可恢复。')) return
+      const ids = Array.from(selectedTrash)
+      try {
+        const r = await apiFetch('/api/trash/batch_purge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids }),
+        })
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok || data.status !== 'success') {
+          alert((data && data.detail) || '批量删除失败')
+          return
+        }
+        const results = Array.isArray(data.results) ? data.results : []
+        const okCount = results.filter(x => x && x.ok).length
+        const failCount = results.length - okCount
+        alert(`已删除：${okCount}，失败：${failCount}`)
+        selectedTrash.clear()
+        await loadTrash()
+      } catch (e) {
+        alert('批量删除失败')
+      }
+    })
     searchBtn.addEventListener('click', runSearch)
     clearSearchBtn.addEventListener('click', clearSearch)
     searchQueryInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch() })

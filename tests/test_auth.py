@@ -225,3 +225,55 @@ def test_trash_delete_restore_and_clear(tmp_path: Path, monkeypatch):
     assert c.status_code == 200
     r4 = client.get("/api/trash", headers={"Authorization": "Bearer " + token})
     assert (r4.json().get("items") or []) == []
+
+
+def test_trash_batch_ops(tmp_path: Path, monkeypatch):
+    db_path = tmp_path / "app.db"
+    monkeypatch.setenv("APP_DB_PATH", str(db_path))
+    monkeypatch.setenv("INVITE_CODE", "abc123")
+    client = TestClient(main.app)
+
+    client.post("/api/auth/register", json={"invite_code": "abc123", "username": "u1", "password": "pw"})
+    token = client.post("/api/auth/login", json={"username": "u1", "password": "pw"}).json()["token"]
+
+    kb_root = tmp_path / "kb"
+    kb_root.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(main, "KNOWLEDGE_BASE_DIR", kb_root)
+
+    cat_dir = kb_root / "u_1" / "数学"
+    cat_dir.mkdir(parents=True, exist_ok=True)
+    (cat_dir / "a.md").write_text("a", encoding="utf-8")
+    (cat_dir / "b.md").write_text("b", encoding="utf-8")
+
+    r = client.post(
+        "/api/trash/batch_delete",
+        json={"items": [{"category": "数学", "filename": "a.md"}, {"category": "数学", "filename": "b.md"}]},
+        headers={"Authorization": "Bearer " + token},
+    )
+    assert r.status_code == 200
+    results = r.json().get("results") or []
+    assert len(results) == 2
+    ids = [x["id"] for x in results if x.get("ok")]
+    assert len(ids) == 2
+
+    r2 = client.get("/api/trash", headers={"Authorization": "Bearer " + token})
+    assert len(r2.json().get("items") or []) == 2
+
+    r3 = client.post("/api/trash/batch_restore", json={"ids": ids}, headers={"Authorization": "Bearer " + token})
+    assert r3.status_code == 200
+    results3 = r3.json().get("results") or []
+    assert sum(1 for x in results3 if x.get("ok")) == 2
+
+    assert (cat_dir / "a.md").exists() or any(p.name.startswith("a-restored-") for p in cat_dir.iterdir())
+    assert (cat_dir / "b.md").exists() or any(p.name.startswith("b-restored-") for p in cat_dir.iterdir())
+
+    r4 = client.post(
+        "/api/trash/batch_delete",
+        json={"items": [{"category": "数学", "filename": "a.md"}, {"category": "数学", "filename": "b.md"}]},
+        headers={"Authorization": "Bearer " + token},
+    )
+    ids2 = [x["id"] for x in (r4.json().get("results") or []) if x.get("ok")]
+    assert ids2
+
+    r5 = client.post("/api/trash/batch_purge", json={"ids": ids2}, headers={"Authorization": "Bearer " + token})
+    assert r5.status_code == 200

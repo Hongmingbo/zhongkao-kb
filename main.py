@@ -146,6 +146,41 @@ def _unique_restore_name(dest_dir: Path, filename: str) -> str:
             return c
         i += 1
 
+
+def _move_to_trash(user_id: int, category: str, filename: str):
+    validate_path_segment(category, "category")
+    validate_path_segment(filename, "filename")
+    kb_dir = user_kb_dir(user_id)
+    file_path = kb_dir / category / filename
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    trash_dir = user_trash_dir(user_id)
+    item_id = secrets.token_hex(12)
+    now = int(time.time())
+
+    meta_path = file_path.with_name(file_path.name + ".meta.json")
+    trash_file = trash_dir / f"{item_id}.file"
+    trash_meta = trash_dir / f"{item_id}.meta.json"
+
+    shutil.move(str(file_path), str(trash_file))
+    if meta_path.exists():
+        shutil.move(str(meta_path), str(trash_meta))
+
+    items = _load_trash_index(trash_dir)
+    items.insert(
+        0,
+        {
+            "id": item_id,
+            "filename": filename,
+            "category": category,
+            "deleted_at": now,
+            "has_meta": trash_meta.exists(),
+        },
+    )
+    _save_trash_index(trash_dir, items[:2000])
+    return {"id": item_id, "filename": filename, "category": category, "deleted_at": now}
+
 DEFAULT_AVATAR_SVG = b"""<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#60a5fa"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs><rect width="128" height="128" rx="64" fill="url(#g)"/><circle cx="64" cy="52" r="22" fill="#eff6ff"/><path d="M22 114c8-22 26-32 42-32s34 10 42 32" fill="#eff6ff"/></svg>"""
 
 def validate_path_segment(value: str, field: str):
@@ -996,38 +1031,8 @@ async def delete_file(
     filename: str,
     current_user: auth.User = Depends(auth.get_current_user),
 ):
-    validate_path_segment(category, "category")
-    validate_path_segment(filename, "filename")
-    kb_dir = user_kb_dir(current_user.id)
-    file_path = kb_dir / category / filename
-    if not file_path.exists() or not file_path.is_file():
-        raise HTTPException(status_code=404, detail="文件不存在")
-        
     try:
-        trash_dir = user_trash_dir(current_user.id)
-        item_id = secrets.token_hex(12)
-        now = int(time.time())
-
-        meta_path = file_path.with_name(file_path.name + ".meta.json")
-        trash_file = trash_dir / f"{item_id}.file"
-        trash_meta = trash_dir / f"{item_id}.meta.json"
-
-        shutil.move(str(file_path), str(trash_file))
-        if meta_path.exists():
-            shutil.move(str(meta_path), str(trash_meta))
-
-        items = _load_trash_index(trash_dir)
-        items.insert(
-            0,
-            {
-                "id": item_id,
-                "filename": filename,
-                "category": category,
-                "deleted_at": now,
-                "has_meta": (trash_meta.exists()),
-            },
-        )
-        _save_trash_index(trash_dir, items[:2000])
+        _move_to_trash(current_user.id, category, filename)
         return {"status": "success", "message": f"文件 {filename} 已移入回收站"}
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
@@ -1107,3 +1112,57 @@ async def delete_trash_item(item_id: str, current_user: auth.User = Depends(auth
     items = [x for x in items if x.get("id") != item_id]
     _save_trash_index(trash_dir, items)
     return {"status": "success"}
+
+
+@app.post("/api/trash/batch_delete")
+async def batch_delete_to_trash(payload: dict = Body(...), current_user: auth.User = Depends(auth.get_current_user)):
+    items = payload.get("items")
+    if not isinstance(items, list) or not items:
+        raise HTTPException(status_code=400, detail="缺少 items")
+    results = []
+    for it in items[:500]:
+        category = (it.get("category") or "").strip()
+        filename = (it.get("filename") or "").strip()
+        try:
+            moved = _move_to_trash(current_user.id, category, filename)
+            results.append({"ok": True, "id": moved["id"], "category": category, "filename": filename})
+        except HTTPException as he:
+            results.append({"ok": False, "category": category, "filename": filename, "error": he.detail})
+        except Exception as e:
+            results.append({"ok": False, "category": category, "filename": filename, "error": str(e)})
+    return {"status": "success", "results": results}
+
+
+@app.post("/api/trash/batch_restore")
+async def batch_restore_from_trash(payload: dict = Body(...), current_user: auth.User = Depends(auth.get_current_user)):
+    ids = payload.get("ids")
+    if not isinstance(ids, list) or not ids:
+        raise HTTPException(status_code=400, detail="缺少 ids")
+    results = []
+    for item_id in ids[:500]:
+        try:
+            r = await restore_trash({"id": str(item_id)}, current_user)
+            restored = r.get("restored") if isinstance(r, dict) else None
+            results.append({"ok": True, "id": item_id, "restored": restored})
+        except HTTPException as he:
+            results.append({"ok": False, "id": item_id, "error": he.detail})
+        except Exception as e:
+            results.append({"ok": False, "id": item_id, "error": str(e)})
+    return {"status": "success", "results": results}
+
+
+@app.post("/api/trash/batch_purge")
+async def batch_purge_trash(payload: dict = Body(...), current_user: auth.User = Depends(auth.get_current_user)):
+    ids = payload.get("ids")
+    if not isinstance(ids, list) or not ids:
+        raise HTTPException(status_code=400, detail="缺少 ids")
+    results = []
+    for item_id in ids[:500]:
+        try:
+            await delete_trash_item(str(item_id), current_user)
+            results.append({"ok": True, "id": item_id})
+        except HTTPException as he:
+            results.append({"ok": False, "id": item_id, "error": he.detail})
+        except Exception as e:
+            results.append({"ok": False, "id": item_id, "error": str(e)})
+    return {"status": "success", "results": results}
