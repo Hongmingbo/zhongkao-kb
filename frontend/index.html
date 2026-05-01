@@ -615,19 +615,15 @@
       try {
         const cachedRaw = localStorage.getItem(QUOTE_CACHE_KEY)
         const cached = cachedRaw ? JSON.parse(cachedRaw) : null
-        const now = new Date()
-        const today = new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' })
-          .formatToParts(now)
-          .reduce((acc, p) => (acc[p.type] = p.value, acc), {})
-        const todayStr = `${today.year}-${today.month}-${today.day}`
-        if (cached && cached.date === todayStr && cached.text && cached.source && cached.summary) {
+        const nowSec = Math.floor(Date.now() / 1000)
+        if (cached && cached.expires_at_ts && nowSec < Number(cached.expires_at_ts) && cached.text && cached.source && cached.summary) {
           renderDailyQuote(cached)
           return
         }
 
         const r = await fetch(API_BASE + '/api/daily_quote')
         const data = await r.json()
-        if (r.ok && data && data.text && data.source && data.summary) {
+        if (r.ok && data && data.text && data.source && data.summary && data.expires_at_ts) {
           localStorage.setItem(QUOTE_CACHE_KEY, JSON.stringify(data))
           renderDailyQuote(data)
           return

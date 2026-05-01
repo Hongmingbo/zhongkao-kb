@@ -885,11 +885,18 @@ async def api_search(
         context=context,
     )
 
+
+def _now_shanghai() -> dt.datetime:
+    return dt.datetime.now(tz=ZoneInfo("Asia/Shanghai"))
+
 @app.get("/api/daily_quote")
 async def get_daily_quote():
-    tz = ZoneInfo("Asia/Shanghai")
-    today = dt.datetime.now(tz=tz).date()
-    date_str = today.isoformat()
+    now = _now_shanghai()
+    slot_dt = now.replace(minute=(now.minute // 10) * 10, second=0, microsecond=0)
+    slot = slot_dt.strftime("%Y-%m-%d %H:%M")
+    expires_at = slot_dt + dt.timedelta(minutes=10)
+    expires_at_ts = int(expires_at.timestamp())
+    date_str = slot_dt.date().isoformat()
 
     quotes = [
         {
@@ -934,9 +941,9 @@ async def get_daily_quote():
         },
     ]
 
-    idx = abs(hash(date_str)) % len(quotes)
+    idx = int(hashlib.md5(slot.encode("utf-8")).hexdigest(), 16) % len(quotes)
     q = quotes[idx]
-    return {"date": date_str, **q}
+    return {"date": date_str, "slot": slot, "expires_at": expires_at.isoformat(), "expires_at_ts": expires_at_ts, **q}
 
 @app.get("/api/filters/options")
 async def get_filter_options(current_user: auth.User = Depends(auth.get_current_user)):

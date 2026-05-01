@@ -1,5 +1,7 @@
 import sys
+import datetime as dt
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from fastapi.testclient import TestClient
 
@@ -72,15 +74,31 @@ def test_root_redirects_to_pages():
 
 
 def test_api_daily_quote_has_required_fields():
+    tz = ZoneInfo("Asia/Shanghai")
     client = TestClient(main.app)
+
+    def set_now(y, m, d, hh, mm):
+        main._now_shanghai = lambda: dt.datetime(y, m, d, hh, mm, tzinfo=tz)
+
+    set_now(2026, 5, 1, 12, 3)
     r = client.get("/api/daily_quote")
     assert r.status_code == 200
     data = r.json()
-    assert set(["date", "text", "source", "summary"]).issubset(set(data.keys()))
-    assert isinstance(data["date"], str) and data["date"]
-    assert isinstance(data["text"], str) and data["text"]
-    assert isinstance(data["source"], str) and data["source"]
-    assert isinstance(data["summary"], str) and data["summary"]
+    assert set(["slot", "expires_at_ts", "text", "source", "summary"]).issubset(set(data.keys()))
+    assert data["slot"] == "2026-05-01 12:00"
+    assert data["expires_at_ts"] == int(dt.datetime(2026, 5, 1, 12, 10, tzinfo=tz).timestamp())
+
+    set_now(2026, 5, 1, 12, 9)
+    r2 = client.get("/api/daily_quote")
+    data2 = r2.json()
+    assert data2["slot"] == "2026-05-01 12:00"
+    assert data2["text"] == data["text"]
+    assert data2["source"] == data["source"]
+
+    set_now(2026, 5, 1, 12, 10)
+    r3 = client.get("/api/daily_quote")
+    data3 = r3.json()
+    assert data3["slot"] == "2026-05-01 12:10"
 
 
 def test_filters_options(tmp_path: Path, monkeypatch):
