@@ -277,3 +277,41 @@ def test_trash_batch_ops(tmp_path: Path, monkeypatch):
 
     r5 = client.post("/api/trash/batch_purge", json={"ids": ids2}, headers={"Authorization": "Bearer " + token})
     assert r5.status_code == 200
+
+
+def test_kb_batch_move_with_rename(tmp_path: Path, monkeypatch):
+    db_path = tmp_path / "app.db"
+    monkeypatch.setenv("APP_DB_PATH", str(db_path))
+    monkeypatch.setenv("INVITE_CODE", "abc123")
+    client = TestClient(main.app)
+
+    client.post("/api/auth/register", json={"invite_code": "abc123", "username": "u1", "password": "pw"})
+    token = client.post("/api/auth/login", json={"username": "u1", "password": "pw"}).json()["token"]
+
+    kb_root = tmp_path / "kb"
+    kb_root.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(main, "KNOWLEDGE_BASE_DIR", kb_root)
+
+    src_dir = kb_root / "u_1" / "语文"
+    dst_dir = kb_root / "u_1" / "数学"
+    src_dir.mkdir(parents=True, exist_ok=True)
+    dst_dir.mkdir(parents=True, exist_ok=True)
+
+    (src_dir / "a.md").write_text("src", encoding="utf-8")
+    (src_dir / "a.md.meta.json").write_text('{"year":"2024"}', encoding="utf-8")
+    (dst_dir / "a.md").write_text("dst", encoding="utf-8")
+
+    r = client.post(
+        "/api/file/batch_move",
+        json={"items": [{"category": "语文", "filename": "a.md"}], "target_category": "数学"},
+        headers={"Authorization": "Bearer " + token},
+    )
+    assert r.status_code == 200
+    res = (r.json().get("results") or [])[0]
+    assert res["ok"] is True
+    new_name = res["new_filename"]
+    assert new_name != ""
+    assert new_name != "a.md"
+    assert not (src_dir / "a.md").exists()
+    assert (dst_dir / new_name).exists()
+    assert (dst_dir / (new_name + ".meta.json")).exists()

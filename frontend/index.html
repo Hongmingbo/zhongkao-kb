@@ -97,8 +97,12 @@
         <div id="bulk-bar" class="hidden mt-4 p-3 rounded-lg border border-blue-100 bg-blue-50 flex items-center justify-between gap-2">
           <div class="text-sm text-blue-900"><span id="bulk-count">已选择 0 个</span></div>
           <div class="flex gap-2">
+            <select id="bulkTargetCategory" class="px-3 py-2 rounded-lg bg-white text-gray-800 text-sm border border-gray-200">
+              <option value="">选择目标学科</option>
+            </select>
             <button id="bulkCancelBtn" class="px-3 py-2 rounded-lg bg-white text-gray-800 text-sm border border-gray-200 hover:bg-gray-50">取消选择</button>
             <button id="bulkTrashBtn" class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">批量移入回收站</button>
+            <button id="bulkMoveBtn" class="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700">批量移动</button>
           </div>
         </div>
         <div class="flex gap-4 mt-4">
@@ -245,8 +249,10 @@
     const clearBtn = document.getElementById('clearBtn')
     const bulkBar = document.getElementById('bulk-bar')
     const bulkCount = document.getElementById('bulk-count')
+    const bulkTargetCategorySelect = document.getElementById('bulkTargetCategory')
     const bulkCancelBtn = document.getElementById('bulkCancelBtn')
     const bulkTrashBtn = document.getElementById('bulkTrashBtn')
+    const bulkMoveBtn = document.getElementById('bulkMoveBtn')
     const searchQueryInput = document.getElementById('searchQuery')
     const searchCategorySelect = document.getElementById('searchCategory')
     const searchBtn = document.getElementById('searchBtn')
@@ -319,6 +325,7 @@
     let avatarObjectUrl = ''
     const selectedKb = new Set()
     const selectedTrash = new Set()
+    let categoriesCache = []
 
     function updateBulkBar() {
       const n = selectedKb.size
@@ -812,8 +819,10 @@
           el.value = current
         }
 
-        setOptions(searchCategorySelect, '全部学科', data.categories || [])
-        setOptions(filterCategorySelect, '全部学科', data.categories || [])
+        categoriesCache = data.categories || []
+        setOptions(searchCategorySelect, '全部学科', categoriesCache)
+        setOptions(filterCategorySelect, '全部学科', categoriesCache)
+        setOptions(bulkTargetCategorySelect, '选择目标学科', categoriesCache)
         setOptions(filterYearSelect, '全部年份', data.years || [])
         setOptions(filterRegionSelect, '全部地区', data.regions || [])
         setOptions(filterTypeSelect, '全部类型', data.types || [])
@@ -1158,6 +1167,38 @@
         else await loadStats()
       } catch (e) {
         alert('批量操作失败')
+      }
+    })
+    bulkMoveBtn.addEventListener('click', async () => {
+      if (!selectedKb.size) return
+      const target_category = (bulkTargetCategorySelect.value || '').trim()
+      if (!target_category) { alert('请选择目标学科'); return }
+      if (!confirm(`确定将已选择的 ${selectedKb.size} 个文件移动到 "${target_category}" 吗？`)) return
+      const items = Array.from(selectedKb).map(k => {
+        const parts = k.split('::')
+        return { category: parts[0] || '', filename: parts.slice(1).join('::') || '' }
+      })
+      try {
+        const r = await apiFetch('/api/file/batch_move', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items, target_category }),
+        })
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok || data.status !== 'success') {
+          alert((data && data.detail) || '批量移动失败')
+          return
+        }
+        const results = Array.isArray(data.results) ? data.results : []
+        const okCount = results.filter(x => x && x.ok).length
+        const failCount = results.length - okCount
+        alert(`已移动：${okCount}，失败：${failCount}`)
+        selectedKb.clear()
+        updateBulkBar()
+        if (filterActive) await applyFilters()
+        else await loadStats()
+      } catch (e) {
+        alert('批量移动失败')
       }
     })
     trashClearSelectedBtn.addEventListener('click', () => { selectedTrash.clear(); void loadTrash() })

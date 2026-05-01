@@ -135,7 +135,7 @@ def _unique_restore_name(dest_dir: Path, filename: str) -> str:
         return filename
     stem = Path(filename).stem
     suffix = "".join(Path(filename).suffixes)
-    ts = dt.datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    ts = dt.datetime.now(dt.UTC).strftime("%Y%m%d%H%M%S")
     candidate = f"{stem}-restored-{ts}{suffix}"
     if not (dest_dir / candidate).exists():
         return candidate
@@ -145,6 +145,54 @@ def _unique_restore_name(dest_dir: Path, filename: str) -> str:
         if not (dest_dir / c).exists():
             return c
         i += 1
+
+
+def _unique_move_name(dest_dir: Path, filename: str) -> str:
+    if not (dest_dir / filename).exists():
+        return filename
+    stem = Path(filename).stem
+    suffix = "".join(Path(filename).suffixes)
+    ts = dt.datetime.now(dt.UTC).strftime("%Y%m%d%H%M%S")
+    candidate = f"{stem}-moved-{ts}{suffix}"
+    if not (dest_dir / candidate).exists():
+        return candidate
+    i = 2
+    while True:
+        c = f"{stem}-moved-{ts}-{i}{suffix}"
+        if not (dest_dir / c).exists():
+            return c
+        i += 1
+
+
+def _move_kb_file(user_id: int, category: str, filename: str, target_category: str) -> dict:
+    validate_path_segment(category, "category")
+    validate_path_segment(target_category, "target_category")
+    validate_path_segment(filename, "filename")
+    if category.startswith("_") or target_category.startswith("_"):
+        raise HTTPException(status_code=400, detail="不支持移动系统目录")
+
+    kb_dir = user_kb_dir(user_id)
+    src_dir = kb_dir / category
+    src_file = src_dir / filename
+    if not src_file.exists() or not src_file.is_file():
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    if category == target_category:
+        return {"category": category, "filename": filename, "new_category": category, "new_filename": filename}
+
+    dest_dir = kb_dir / target_category
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest_name = _unique_move_name(dest_dir, filename)
+    dest_file = dest_dir / dest_name
+
+    src_meta = src_file.with_name(src_file.name + ".meta.json")
+    dest_meta = dest_file.with_name(dest_file.name + ".meta.json")
+
+    shutil.move(str(src_file), str(dest_file))
+    if src_meta.exists():
+        shutil.move(str(src_meta), str(dest_meta))
+
+    return {"category": category, "filename": filename, "new_category": target_category, "new_filename": dest_name}
 
 
 def _move_to_trash(user_id: int, category: str, filename: str):
@@ -1036,6 +1084,29 @@ async def delete_file(
         return {"status": "success", "message": f"文件 {filename} 已移入回收站"}
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+@app.post("/api/file/batch_move")
+async def batch_move_files(payload: dict = Body(...), current_user: auth.User = Depends(auth.get_current_user)):
+    items = payload.get("items")
+    target_category = (payload.get("target_category") or "").strip()
+    if not isinstance(items, list) or not items:
+        raise HTTPException(status_code=400, detail="缺少 items")
+    if not target_category:
+        raise HTTPException(status_code=400, detail="缺少 target_category")
+
+    results = []
+    for it in items[:500]:
+        category = (it.get("category") or "").strip()
+        filename = (it.get("filename") or "").strip()
+        try:
+            r = _move_kb_file(current_user.id, category, filename, target_category)
+            results.append({"ok": True, **r})
+        except HTTPException as he:
+            results.append({"ok": False, "category": category, "filename": filename, "error": he.detail})
+        except Exception as e:
+            results.append({"ok": False, "category": category, "filename": filename, "error": str(e)})
+    return {"status": "success", "results": results}
 
 
 @app.get("/api/trash")
