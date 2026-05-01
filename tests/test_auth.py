@@ -514,11 +514,11 @@ def test_missing_avatar_file_clears_db_flag(tmp_path: Path, monkeypatch):
 
     r2 = client.get("/api/profile/avatar", headers={"Authorization": "Bearer " + token})
     assert r2.status_code == 200
-    assert r2.headers.get("content-type", "").startswith("image/svg+xml")
+    assert r2.headers.get("content-type", "").startswith("image/png")
 
     r3 = client.get("/api/auth/me", headers={"Authorization": "Bearer " + token})
     assert r3.status_code == 200
-    assert r3.json()["has_avatar"] is False
+    assert r3.json()["has_avatar"] is True
 
 
 def test_avatar_response_no_store_cache_headers(tmp_path: Path, monkeypatch):

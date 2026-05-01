@@ -716,7 +716,7 @@ async def me(current_user: auth.User = Depends(auth.get_current_user)):
         "id": current_user.id,
         "username": current_user.username,
         "nickname": p.get("nickname") or "",
-        "has_avatar": bool(p.get("avatar_filename")),
+        "has_avatar": auth.has_avatar(current_user.id),
     }
 
 
@@ -769,14 +769,14 @@ async def upload_profile_avatar(
     avatar_filename = f"avatar.{ext}"
     avatar_path = pdir / avatar_filename
     avatar_path.write_bytes(content)
-    auth.set_avatar_filename(current_user.id, avatar_filename)
+    auth.set_avatar(current_user.id, avatar_filename, file.content_type or "", content)
     return {"status": "success"}
 
 
 @app.get("/api/profile/avatar")
 async def get_profile_avatar(current_user: auth.User = Depends(auth.get_current_user)):
-    p = auth.get_profile(current_user.id)
-    avatar_filename = (p.get("avatar_filename") or "").strip()
+    rec = auth.get_avatar_record(current_user.id)
+    avatar_filename = (rec.get("avatar_filename") or "").strip()
     if avatar_filename:
         pdir = user_profile_dir(current_user.id)
         avatar_path = pdir / avatar_filename
@@ -788,7 +788,11 @@ async def get_profile_avatar(current_user: auth.User = Depends(auth.get_current_
             elif ext == "webp":
                 ct = "image/webp"
             return Response(content=avatar_path.read_bytes(), media_type=ct, headers={"Cache-Control": "no-store"})
-        auth.set_avatar_filename(current_user.id, "")
+    avatar_data = rec.get("avatar_data")
+    avatar_ct = (rec.get("avatar_content_type") or "").strip() or "image/png"
+    if isinstance(avatar_data, (bytes, bytearray)) and len(avatar_data) > 0:
+        return Response(content=bytes(avatar_data), media_type=avatar_ct, headers={"Cache-Control": "no-store"})
+    auth.set_avatar_filename(current_user.id, "")
     return Response(content=DEFAULT_AVATAR_SVG, media_type="image/svg+xml", headers={"Cache-Control": "no-store"})
 
 

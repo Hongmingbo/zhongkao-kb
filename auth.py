@@ -97,6 +97,8 @@ def init_db():
                   password_hash TEXT NOT NULL,
                   nickname TEXT,
                   avatar_filename TEXT,
+                  avatar_content_type TEXT,
+                  avatar_data BYTEA,
                   created_at BIGINT NOT NULL
                 )
                 """
@@ -112,6 +114,25 @@ def init_db():
                 """
             )
             cur.execute("CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions(user_id)")
+            cur.execute(
+                """
+                DO $$
+                BEGIN
+                  IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='users' AND column_name='avatar_content_type'
+                  ) THEN
+                    ALTER TABLE users ADD COLUMN avatar_content_type TEXT;
+                  END IF;
+                  IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='users' AND column_name='avatar_data'
+                  ) THEN
+                    ALTER TABLE users ADD COLUMN avatar_data BYTEA;
+                  END IF;
+                END $$;
+                """
+            )
         return
 
     conn = _sqlite_conn()
@@ -143,6 +164,10 @@ def init_db():
             conn.execute("ALTER TABLE users ADD COLUMN nickname TEXT")
         if "avatar_filename" not in cols:
             conn.execute("ALTER TABLE users ADD COLUMN avatar_filename TEXT")
+        if "avatar_content_type" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN avatar_content_type TEXT")
+        if "avatar_data" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN avatar_data BLOB")
         conn.commit()
     finally:
         conn.close()
@@ -417,6 +442,83 @@ def set_avatar_filename(user_id: int, avatar_filename: str) -> str:
         conn.execute("UPDATE users SET avatar_filename=? WHERE id=?", (avatar_filename, user_id))
         conn.commit()
         return avatar_filename
+    finally:
+        conn.close()
+
+
+def set_avatar(user_id: int, avatar_filename: str, avatar_content_type: str, avatar_data: bytes) -> str:
+    init_db()
+    if db_backend() == "postgres":
+        with _pg_cursor(False) as cur:
+            cur.execute(
+                "UPDATE users SET avatar_filename=%s, avatar_content_type=%s, avatar_data=%s WHERE id=%s",
+                (avatar_filename, avatar_content_type, avatar_data, user_id),
+            )
+        return avatar_filename
+    conn = _sqlite_conn()
+    try:
+        conn.execute(
+            "UPDATE users SET avatar_filename=?, avatar_content_type=?, avatar_data=? WHERE id=?",
+            (avatar_filename, avatar_content_type, avatar_data, user_id),
+        )
+        conn.commit()
+        return avatar_filename
+    finally:
+        conn.close()
+
+
+def get_avatar_record(user_id: int) -> dict:
+    init_db()
+    if db_backend() == "postgres":
+        with _pg_cursor(True) as cur:
+            cur.execute("SELECT avatar_filename, avatar_content_type, avatar_data FROM users WHERE id=%s", (user_id,))
+            row = cur.fetchone()
+            if not row:
+                return {"avatar_filename": "", "avatar_content_type": "", "avatar_data": None}
+            return {
+                "avatar_filename": row.get("avatar_filename") or "",
+                "avatar_content_type": row.get("avatar_content_type") or "",
+                "avatar_data": row.get("avatar_data"),
+            }
+    conn = _sqlite_conn()
+    try:
+        row = conn.execute(
+            "SELECT avatar_filename, avatar_content_type, avatar_data FROM users WHERE id=?",
+            (user_id,),
+        ).fetchone()
+        if not row:
+            return {"avatar_filename": "", "avatar_content_type": "", "avatar_data": None}
+        return {
+            "avatar_filename": row["avatar_filename"] or "",
+            "avatar_content_type": row["avatar_content_type"] or "",
+            "avatar_data": row["avatar_data"],
+        }
+    finally:
+        conn.close()
+
+
+def has_avatar(user_id: int) -> bool:
+    init_db()
+    if db_backend() == "postgres":
+        with _pg_cursor(True) as cur:
+            cur.execute(
+                "SELECT avatar_filename, octet_length(avatar_data) as l FROM users WHERE id=%s",
+                (user_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return False
+            if (row.get("avatar_filename") or "").strip():
+                return True
+            return int(row.get("l") or 0) > 0
+    conn = _sqlite_conn()
+    try:
+        row = conn.execute("SELECT avatar_filename, length(avatar_data) as l FROM users WHERE id=?", (user_id,)).fetchone()
+        if not row:
+            return False
+        if (row["avatar_filename"] or "").strip():
+            return True
+        return int(row["l"] or 0) > 0
     finally:
         conn.close()
 
