@@ -533,3 +533,7 @@ def test_avatar_response_no_store_cache_headers(tmp_path: Path, monkeypatch):
     r1 = client.get("/api/profile/avatar", headers={"Authorization": "Bearer " + token})
     assert r1.status_code == 200
     assert "no-store" in (r1.headers.get("cache-control") or "").lower()
+
+
+def test_coerce_avatar_bytes_accepts_memoryview():
+    assert main._coerce_avatar_bytes(memoryview(b"abc")) == b"abc"

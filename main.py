@@ -788,10 +788,10 @@ async def get_profile_avatar(current_user: auth.User = Depends(auth.get_current_
             elif ext == "webp":
                 ct = "image/webp"
             return Response(content=avatar_path.read_bytes(), media_type=ct, headers={"Cache-Control": "no-store"})
-    avatar_data = rec.get("avatar_data")
+    avatar_data = _coerce_avatar_bytes(rec.get("avatar_data"))
     avatar_ct = (rec.get("avatar_content_type") or "").strip() or "image/png"
-    if isinstance(avatar_data, (bytes, bytearray)) and len(avatar_data) > 0:
-        return Response(content=bytes(avatar_data), media_type=avatar_ct, headers={"Cache-Control": "no-store"})
+    if len(avatar_data) > 0:
+        return Response(content=avatar_data, media_type=avatar_ct, headers={"Cache-Control": "no-store"})
     auth.set_avatar_filename(current_user.id, "")
     return Response(content=DEFAULT_AVATAR_SVG, media_type="image/svg+xml", headers={"Cache-Control": "no-store"})
 
@@ -893,6 +893,16 @@ async def api_search(
 
 def _now_shanghai() -> dt.datetime:
     return dt.datetime.now(tz=ZoneInfo("Asia/Shanghai"))
+
+
+def _coerce_avatar_bytes(x) -> bytes:
+    if x is None:
+        return b""
+    if isinstance(x, (bytes, bytearray)):
+        return bytes(x)
+    if isinstance(x, memoryview):
+        return x.tobytes()
+    return b""
 
 @app.get("/api/daily_quote")
 async def get_daily_quote():
