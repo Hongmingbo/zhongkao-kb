@@ -104,6 +104,7 @@
             <button id="bulkTrashBtn" class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">批量移入回收站</button>
             <button id="bulkMoveBtn" class="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700">批量移动</button>
             <button id="bulkMetaBtn" class="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700">批量改标签</button>
+            <button id="bulkBatchRenameBtn" class="px-3 py-2 rounded-lg bg-gray-800 text-white text-sm hover:bg-gray-900">批量重命名</button>
           </div>
         </div>
         <div class="flex gap-4 mt-4">
@@ -181,6 +182,35 @@
           <button id="renameApplyBtn" class="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm hover:bg-gray-900">确认重命名</button>
         </div>
         <div id="rename-msg" class="text-sm"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="batch-rename-modal" class="fixed inset-0 z-50 hidden bg-gray-900 bg-opacity-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-lg w-full max-w-xl">
+      <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+        <div class="text-lg font-semibold text-gray-800">批量重命名</div>
+        <button id="closeBatchRename" class="text-gray-400 hover:text-gray-600 focus:outline-none">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <div class="p-4 space-y-3">
+        <div class="text-xs text-gray-500">仅修改文件名（保留原扩展名）；同名冲突会自动加 -renamed-时间戳</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <input id="brFind" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="查找（可空）">
+          <input id="brReplace" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="替换为（可空）">
+          <input id="brPrefix" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="前缀（可空）">
+          <input id="brSuffix" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="后缀（可空）">
+        </div>
+        <div class="flex items-center gap-2">
+          <input id="brEnableNumber" type="checkbox" class="h-4 w-4">
+          <div class="text-sm text-gray-700">编号序列（001/002…）</div>
+          <input id="brStart" class="w-24 px-3 py-2 border rounded-lg text-sm" placeholder="起始" value="1">
+        </div>
+        <div class="flex justify-end gap-2">
+          <button id="brApplyBtn" class="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm hover:bg-gray-900">执行批量重命名</button>
+        </div>
+        <div id="br-msg" class="text-sm"></div>
       </div>
     </div>
   </div>
@@ -295,6 +325,7 @@
     const bulkTrashBtn = document.getElementById('bulkTrashBtn')
     const bulkMoveBtn = document.getElementById('bulkMoveBtn')
     const bulkMetaBtn = document.getElementById('bulkMetaBtn')
+    const bulkBatchRenameBtn = document.getElementById('bulkBatchRenameBtn')
     const searchQueryInput = document.getElementById('searchQuery')
     const searchCategorySelect = document.getElementById('searchCategory')
     const searchBtn = document.getElementById('searchBtn')
@@ -359,6 +390,16 @@
     const renameInput = document.getElementById('renameInput')
     const renameApplyBtn = document.getElementById('renameApplyBtn')
     const renameMsg = document.getElementById('rename-msg')
+    const batchRenameModal = document.getElementById('batch-rename-modal')
+    const closeBatchRenameBtn = document.getElementById('closeBatchRename')
+    const brFind = document.getElementById('brFind')
+    const brReplace = document.getElementById('brReplace')
+    const brPrefix = document.getElementById('brPrefix')
+    const brSuffix = document.getElementById('brSuffix')
+    const brEnableNumber = document.getElementById('brEnableNumber')
+    const brStart = document.getElementById('brStart')
+    const brApplyBtn = document.getElementById('brApplyBtn')
+    const brMsg = document.getElementById('br-msg')
     const oldPasswordInput = document.getElementById('oldPasswordInput')
     const newPasswordInput = document.getElementById('newPasswordInput')
     const newPassword2Input = document.getElementById('newPassword2Input')
@@ -436,6 +477,18 @@
       renameMsg.textContent = ''
       renameMsg.className = 'text-sm'
       renameTarget = { category: '', filename: '' }
+    }
+
+    function showBatchRenameModal() {
+      brMsg.textContent = ''
+      brMsg.className = 'text-sm'
+      batchRenameModal.classList.remove('hidden')
+    }
+
+    function hideBatchRenameModal() {
+      batchRenameModal.classList.add('hidden')
+      brMsg.textContent = ''
+      brMsg.className = 'text-sm'
     }
 
     function renderUserBar(user) {
@@ -1237,6 +1290,85 @@
       }
     }
 
+    function computeBatchRenamePlan() {
+      const find = (brFind.value || '').trim()
+      const replace = brReplace.value || ''
+      const prefix = brPrefix.value || ''
+      const suffix = brSuffix.value || ''
+      const enableNumber = !!brEnableNumber.checked
+      const start = parseInt((brStart.value || '1').trim(), 10)
+      const startNum = isFinite(start) && start > 0 ? start : 1
+      const keys = Array.from(selectedKb).slice().sort()
+
+      const items = keys.map((k, idx) => {
+        const parts = k.split('::')
+        const category = parts[0] || ''
+        const old_filename = parts.slice(1).join('::') || ''
+
+        const dot = old_filename.lastIndexOf('.')
+        const base = dot > 0 ? old_filename.slice(0, dot) : old_filename
+        const ext = dot > 0 ? old_filename.slice(dot) : ''
+
+        let name = base
+        if (find) name = name.split(find).join(replace)
+        name = `${prefix}${name}${suffix}`
+        if (enableNumber) {
+          const n = String(startNum + idx).padStart(3, '0')
+          name = `${n}-${name}`
+        }
+        const new_filename = `${name}${ext}`
+        return { category, old_filename, new_filename }
+      })
+
+      return items
+    }
+
+    async function doBatchRename() {
+      if (!selectedKb.size) return
+      const items = computeBatchRenamePlan().filter(it => it.old_filename && it.new_filename && it.old_filename !== it.new_filename)
+      if (!items.length) {
+        brMsg.textContent = '没有可重命名的文件（新旧文件名一致或为空）'
+        brMsg.className = 'text-sm text-amber-700'
+        return
+      }
+      if (!confirm(`确定重命名 ${items.length} 个文件吗？`)) return
+      try {
+        const r = await apiFetch('/api/file/batch_rename', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items }),
+        })
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok || data.status !== 'success') {
+          brMsg.textContent = (data && data.detail) || '批量重命名失败'
+          brMsg.className = 'text-sm text-red-700'
+          return
+        }
+        const results = Array.isArray(data.results) ? data.results : []
+        const okCount = results.filter(x => x && x.ok).length
+        const failCount = results.length - okCount
+        brMsg.textContent = `重命名完成：成功 ${okCount}，失败 ${failCount}`
+        brMsg.className = failCount ? 'text-sm text-amber-700' : 'text-sm text-green-700'
+
+        results.forEach(x => {
+          if (!x || !x.ok) return
+          const cat = x.category || ''
+          const oldName = x.old_filename || ''
+          const newName = x.new_filename || ''
+          if (!cat || !oldName || !newName) return
+          selectedKb.delete(cat + '::' + oldName)
+          selectedKb.add(cat + '::' + newName)
+        })
+        updateBulkBar()
+        if (filterActive) await applyFilters()
+        else await loadStats()
+        setTimeout(hideBatchRenameModal, 400)
+      } catch (e) {
+        brMsg.textContent = '批量重命名失败'
+        brMsg.className = 'text-sm text-red-700'
+      }
+    }
+
     async function deleteFile(category, filename) {
       const base = getApiBase()
       if (!confirm(`确定要删除文件 "${filename}" 吗？`)) return
@@ -1329,6 +1461,10 @@
     bulkMetaBtn.addEventListener('click', () => {
       if (!selectedKb.size) return
       showMetaModal()
+    })
+    bulkBatchRenameBtn.addEventListener('click', () => {
+      if (!selectedKb.size) return
+      showBatchRenameModal()
     })
     trashClearSelectedBtn.addEventListener('click', () => { selectedTrash.clear(); void loadTrash() })
     trashRestoreSelectedBtn.addEventListener('click', async () => {
@@ -1432,6 +1568,9 @@
     renameModal.addEventListener('click', (e) => { if (e.target === renameModal) hideRenameModal() })
     renameApplyBtn.addEventListener('click', doRename)
     renameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doRename() })
+    closeBatchRenameBtn.addEventListener('click', hideBatchRenameModal)
+    batchRenameModal.addEventListener('click', (e) => { if (e.target === batchRenameModal) hideBatchRenameModal() })
+    brApplyBtn.addEventListener('click', doBatchRename)
     searchBtn.addEventListener('click', runSearch)
     clearSearchBtn.addEventListener('click', clearSearch)
     searchQueryInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch() })

@@ -18,6 +18,19 @@ git push -f hf main
 
 Space 会自动构建并启动（容器端口为 7860）。
 
+## 3.1 开启持久化存储（重要：解决头像/知识库丢失）
+
+Hugging Face Spaces 默认容器文件系统不持久化：每次 push 或重启都可能导致 `knowledge_base/` 内的头像和资料丢失。
+
+请在 Space Settings 中开启 Persistent Storage，然后新增 Variable：
+
+- `KNOWLEDGE_BASE_DIR`（Variable）：`/data/knowledge_base`
+
+说明：
+
+- 开启持久化后，`/data` 目录会跨重启/重建保留
+- 本项目会优先使用 `KNOWLEDGE_BASE_DIR` 作为知识库根目录，从而让头像与资料持久化
+
 ## 3. 必需环境变量（推荐配置）
 
 在 Space Settings → Variables and secrets 中配置：
@@ -42,4 +55,3 @@ Space Logs 中应看到：
 若出现 `password authentication failed`：
 - 检查连接串中是否仍含 `[YOUR-PASSWORD]`
 - 或重置 Supabase 数据库密码后重新复制 Transaction pooler URI
-

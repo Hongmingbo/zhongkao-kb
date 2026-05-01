@@ -63,11 +63,19 @@ app.add_middleware(
 )
 
 BASE_DIR = Path(__file__).parent
-KNOWLEDGE_BASE_DIR = BASE_DIR / "knowledge_base"
 STATIC_DIR = BASE_DIR / "static"
 
-KNOWLEDGE_BASE_DIR.mkdir(parents=True, exist_ok=True)
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
+
+def resolve_knowledge_base_dir() -> Path:
+    raw = (os.getenv("KNOWLEDGE_BASE_DIR") or "").strip()
+    if raw:
+        return Path(raw)
+    return BASE_DIR / "knowledge_base"
+
+
+KNOWLEDGE_BASE_DIR = resolve_knowledge_base_dir()
+KNOWLEDGE_BASE_DIR.mkdir(parents=True, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
@@ -1220,6 +1228,30 @@ async def rename_file(payload: dict = Body(...), current_user: auth.User = Depen
         raise HTTPException(status_code=400, detail="参数不完整")
     r = _rename_kb_file(current_user.id, category, old_filename, new_filename)
     return {"status": "success", "new_filename": r["new_filename"]}
+
+
+@app.post("/api/file/batch_rename")
+async def batch_rename_files(payload: dict = Body(...), current_user: auth.User = Depends(auth.get_current_user)):
+    items = payload.get("items")
+    if not isinstance(items, list) or not items:
+        raise HTTPException(status_code=400, detail="缺少 items")
+    results = []
+    for it in items[:500]:
+        category = (it.get("category") or "").strip()
+        old_filename = (it.get("old_filename") or "").strip()
+        new_filename = (it.get("new_filename") or "").strip()
+        try:
+            r = _rename_kb_file(current_user.id, category, old_filename, new_filename)
+            results.append({"ok": True, **r})
+        except HTTPException as he:
+            results.append(
+                {"ok": False, "category": category, "old_filename": old_filename, "new_filename": new_filename, "error": he.detail}
+            )
+        except Exception as e:
+            results.append(
+                {"ok": False, "category": category, "old_filename": old_filename, "new_filename": new_filename, "error": str(e)}
+            )
+    return {"status": "success", "results": results}
 
 
 @app.get("/api/trash")

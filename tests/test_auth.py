@@ -403,3 +403,53 @@ def test_file_rename_and_meta_rename(tmp_path: Path, monkeypatch):
     assert not (cat_dir / "a.md.meta.json").exists()
     assert (cat_dir / new_name).exists()
     assert (cat_dir / (new_name + ".meta.json")).exists()
+
+
+def test_batch_rename_auto_conflict_resolution(tmp_path: Path, monkeypatch):
+    db_path = tmp_path / "app.db"
+    monkeypatch.setenv("APP_DB_PATH", str(db_path))
+    monkeypatch.setenv("INVITE_CODE", "abc123")
+    client = TestClient(main.app)
+
+    client.post("/api/auth/register", json={"invite_code": "abc123", "username": "u1", "password": "pw"})
+    token = client.post("/api/auth/login", json={"username": "u1", "password": "pw"}).json()["token"]
+
+    kb_root = tmp_path / "kb"
+    kb_root.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(main, "KNOWLEDGE_BASE_DIR", kb_root)
+
+    cat_dir = kb_root / "u_1" / "语文"
+    cat_dir.mkdir(parents=True, exist_ok=True)
+    (cat_dir / "a.md").write_text("a", encoding="utf-8")
+    (cat_dir / "a.md.meta.json").write_text('{"year":"2024"}', encoding="utf-8")
+    (cat_dir / "b.md").write_text("b", encoding="utf-8")
+    (cat_dir / "b.md.meta.json").write_text('{"year":"2025"}', encoding="utf-8")
+
+    r = client.post(
+        "/api/file/batch_rename",
+        json={
+            "items": [
+                {"category": "语文", "old_filename": "a.md", "new_filename": "x.md"},
+                {"category": "语文", "old_filename": "b.md", "new_filename": "x.md"},
+            ]
+        },
+        headers={"Authorization": "Bearer " + token},
+    )
+    assert r.status_code == 200
+    results = r.json().get("results") or []
+    assert len(results) == 2
+    assert all(x.get("ok") for x in results)
+    names = [x.get("new_filename") for x in results]
+    assert names[0] != ""
+    assert names[1] != ""
+    assert names[0] != names[1]
+    assert not (cat_dir / "a.md").exists()
+    assert not (cat_dir / "b.md").exists()
+    assert all((cat_dir / n).exists() for n in names)
+    assert all((cat_dir / (n + ".meta.json")).exists() for n in names)
+
+
+def test_resolve_knowledge_base_dir_env(monkeypatch):
+    monkeypatch.setenv("KNOWLEDGE_BASE_DIR", "/data/knowledge_base_test")
+    p = main.resolve_knowledge_base_dir()
+    assert str(p) == "/data/knowledge_base_test"
