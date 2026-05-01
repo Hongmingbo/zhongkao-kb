@@ -30,6 +30,7 @@
 - `GET /api/filter`：按条件筛选文件
 - `DELETE /api/file/{category}/{filename}`：删除文件
 - `POST /api/file/batch_move`：批量移动文件到目标学科（同名自动改名）
+- `POST /api/meta/batch_update`：批量更新元数据标签（year/region/type，空值不修改）
 - `DELETE /api/clear`：清空知识库
 - `POST /api/split`：试卷拆题
 - `GET /api/questions/{category}/{filename}`：获取拆题结果
