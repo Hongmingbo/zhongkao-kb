@@ -933,6 +933,65 @@ async def get_filter_options(current_user: auth.User = Depends(auth.get_current_
         "exts": sorted(exts),
     }
 
+
+@app.post("/api/meta/batch_update")
+async def batch_update_meta(payload: dict = Body(...), current_user: auth.User = Depends(auth.get_current_user)):
+    items = payload.get("items")
+    patch = payload.get("patch") or {}
+    if not isinstance(items, list) or not items:
+        raise HTTPException(status_code=400, detail="缺少 items")
+    if not isinstance(patch, dict) or not patch:
+        raise HTTPException(status_code=400, detail="缺少 patch")
+
+    allowed = {"year", "region", "type"}
+    clean_patch = {}
+    for k in allowed:
+        v = patch.get(k)
+        if v is None:
+            continue
+        if not isinstance(v, str):
+            v = str(v)
+        v = v.strip()
+        if v:
+            clean_patch[k] = v
+    if not clean_patch:
+        raise HTTPException(status_code=400, detail="patch 不能为空")
+
+    kb_dir = user_kb_dir(current_user.id)
+    results = []
+    for it in items[:500]:
+        category = (it.get("category") or "").strip()
+        filename = (it.get("filename") or "").strip()
+        try:
+            validate_path_segment(category, "category")
+            validate_path_segment(filename, "filename")
+            if category.startswith("_"):
+                raise HTTPException(status_code=400, detail="不支持修改系统目录")
+
+            file_path = kb_dir / category / filename
+            if not file_path.exists() or not file_path.is_file():
+                raise HTTPException(status_code=404, detail="文件不存在")
+
+            meta_path = file_path.with_name(file_path.name + ".meta.json")
+            if meta_path.exists():
+                try:
+                    meta = json.loads(meta_path.read_text(encoding="utf-8", errors="ignore") or "{}")
+                except Exception:
+                    meta = {}
+                if not isinstance(meta, dict):
+                    meta = {}
+            else:
+                meta = {}
+
+            meta.update(clean_patch)
+            meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+            results.append({"ok": True, "category": category, "filename": filename, "has_meta": True})
+        except HTTPException as he:
+            results.append({"ok": False, "category": category, "filename": filename, "error": he.detail})
+        except Exception as e:
+            results.append({"ok": False, "category": category, "filename": filename, "error": str(e)})
+    return {"status": "success", "results": results}
+
 @app.get("/api/filter")
 async def filter_files(
     category: Optional[str] = Query(None),

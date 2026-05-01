@@ -1,4 +1,5 @@
 import sys
+import json
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -315,3 +316,53 @@ def test_kb_batch_move_with_rename(tmp_path: Path, monkeypatch):
     assert not (src_dir / "a.md").exists()
     assert (dst_dir / new_name).exists()
     assert (dst_dir / (new_name + ".meta.json")).exists()
+
+
+def test_meta_batch_update_creates_and_merges(tmp_path: Path, monkeypatch):
+    db_path = tmp_path / "app.db"
+    monkeypatch.setenv("APP_DB_PATH", str(db_path))
+    monkeypatch.setenv("INVITE_CODE", "abc123")
+    client = TestClient(main.app)
+
+    client.post("/api/auth/register", json={"invite_code": "abc123", "username": "u1", "password": "pw"})
+    token = client.post("/api/auth/login", json={"username": "u1", "password": "pw"}).json()["token"]
+
+    kb_root = tmp_path / "kb"
+    kb_root.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(main, "KNOWLEDGE_BASE_DIR", kb_root)
+
+    cat_dir = kb_root / "u_1" / "语文"
+    cat_dir.mkdir(parents=True, exist_ok=True)
+    (cat_dir / "a.md").write_text("x", encoding="utf-8")
+
+    r = client.post(
+        "/api/meta/batch_update",
+        json={
+            "items": [{"category": "语文", "filename": "a.md"}],
+            "patch": {"year": "2024", "region": "", "type": "真题"},
+        },
+        headers={"Authorization": "Bearer " + token},
+    )
+    assert r.status_code == 200
+    res = (r.json().get("results") or [])[0]
+    assert res["ok"] is True
+
+    meta_path = cat_dir / "a.md.meta.json"
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    assert meta["year"] == "2024"
+    assert meta["type"] == "真题"
+    assert "region" not in meta
+
+    r2 = client.post(
+        "/api/meta/batch_update",
+        json={
+            "items": [{"category": "语文", "filename": "a.md"}],
+            "patch": {"region": "北京"},
+        },
+        headers={"Authorization": "Bearer " + token},
+    )
+    assert r2.status_code == 200
+    meta2 = json.loads(meta_path.read_text(encoding="utf-8"))
+    assert meta2["year"] == "2024"
+    assert meta2["type"] == "真题"
+    assert meta2["region"] == "北京"
