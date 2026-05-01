@@ -453,3 +453,69 @@ def test_resolve_knowledge_base_dir_env(monkeypatch):
     monkeypatch.setenv("KNOWLEDGE_BASE_DIR", "/data/knowledge_base_test")
     p = main.resolve_knowledge_base_dir()
     assert str(p) == "/data/knowledge_base_test"
+
+
+def test_clear_kb_keeps_profile_avatar(tmp_path: Path, monkeypatch):
+    db_path = tmp_path / "app.db"
+    monkeypatch.setenv("APP_DB_PATH", str(db_path))
+    monkeypatch.setenv("INVITE_CODE", "abc123")
+    client = TestClient(main.app)
+
+    client.post("/api/auth/register", json={"invite_code": "abc123", "username": "u1", "password": "pw"})
+    token = client.post("/api/auth/login", json={"username": "u1", "password": "pw"}).json()["token"]
+
+    kb_root = tmp_path / "kb"
+    kb_root.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(main, "KNOWLEDGE_BASE_DIR", kb_root)
+
+    r1 = client.post(
+        "/api/profile/avatar",
+        headers={"Authorization": "Bearer " + token},
+        files={"file": ("a.png", b"\x89PNG\r\n\x1a\nfake", "image/png")},
+    )
+    assert r1.status_code == 200
+    assert r1.json()["status"] == "success"
+
+    r2 = client.delete("/api/clear", headers={"Authorization": "Bearer " + token})
+    assert r2.status_code == 200
+
+    r3 = client.get("/api/profile/avatar", headers={"Authorization": "Bearer " + token})
+    assert r3.status_code == 200
+    assert r3.headers.get("content-type", "").startswith("image/png")
+
+    r4 = client.get("/api/auth/me", headers={"Authorization": "Bearer " + token})
+    assert r4.status_code == 200
+    assert r4.json()["has_avatar"] is True
+
+
+def test_missing_avatar_file_clears_db_flag(tmp_path: Path, monkeypatch):
+    db_path = tmp_path / "app.db"
+    monkeypatch.setenv("APP_DB_PATH", str(db_path))
+    monkeypatch.setenv("INVITE_CODE", "abc123")
+    client = TestClient(main.app)
+
+    client.post("/api/auth/register", json={"invite_code": "abc123", "username": "u1", "password": "pw"})
+    token = client.post("/api/auth/login", json={"username": "u1", "password": "pw"}).json()["token"]
+
+    kb_root = tmp_path / "kb"
+    kb_root.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(main, "KNOWLEDGE_BASE_DIR", kb_root)
+
+    r1 = client.post(
+        "/api/profile/avatar",
+        headers={"Authorization": "Bearer " + token},
+        files={"file": ("a.png", b"\x89PNG\r\n\x1a\nfake", "image/png")},
+    )
+    assert r1.status_code == 200
+
+    pdir = main.user_profile_dir(1)
+    for p in pdir.glob("avatar.*"):
+        p.unlink(missing_ok=True)
+
+    r2 = client.get("/api/profile/avatar", headers={"Authorization": "Bearer " + token})
+    assert r2.status_code == 200
+    assert r2.headers.get("content-type", "").startswith("image/svg+xml")
+
+    r3 = client.get("/api/auth/me", headers={"Authorization": "Bearer " + token})
+    assert r3.status_code == 200
+    assert r3.json()["has_avatar"] is False

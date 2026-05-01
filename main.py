@@ -788,6 +788,7 @@ async def get_profile_avatar(current_user: auth.User = Depends(auth.get_current_
             elif ext == "webp":
                 ct = "image/webp"
             return Response(content=avatar_path.read_bytes(), media_type=ct)
+        auth.set_avatar_filename(current_user.id, "")
     return Response(content=DEFAULT_AVATAR_SVG, media_type="image/svg+xml")
 
 
@@ -1160,6 +1161,8 @@ async def clear_knowledge_base(current_user: auth.User = Depends(auth.get_curren
     try:
         kb_dir = user_kb_dir(current_user.id)
         for item in kb_dir.iterdir():
+            if item.name.startswith("_"):
+                continue
             if item.is_dir():
                 shutil.rmtree(item)
             else:
