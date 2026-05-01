@@ -519,3 +519,17 @@ def test_missing_avatar_file_clears_db_flag(tmp_path: Path, monkeypatch):
     r3 = client.get("/api/auth/me", headers={"Authorization": "Bearer " + token})
     assert r3.status_code == 200
     assert r3.json()["has_avatar"] is False
+
+
+def test_avatar_response_no_store_cache_headers(tmp_path: Path, monkeypatch):
+    db_path = tmp_path / "app.db"
+    monkeypatch.setenv("APP_DB_PATH", str(db_path))
+    monkeypatch.setenv("INVITE_CODE", "abc123")
+    client = TestClient(main.app)
+
+    client.post("/api/auth/register", json={"invite_code": "abc123", "username": "u1", "password": "pw"})
+    token = client.post("/api/auth/login", json={"username": "u1", "password": "pw"}).json()["token"]
+
+    r1 = client.get("/api/profile/avatar", headers={"Authorization": "Bearer " + token})
+    assert r1.status_code == 200
+    assert "no-store" in (r1.headers.get("cache-control") or "").lower()

@@ -566,7 +566,7 @@
 
     async function loadAvatar() {
       try {
-        const r = await apiFetch('/api/profile/avatar')
+        const r = await apiFetch('/api/profile/avatar?ts=' + Date.now())
         if (!r.ok) return
         const blob = await r.blob()
         if (avatarObjectUrl) URL.revokeObjectURL(avatarObjectUrl)

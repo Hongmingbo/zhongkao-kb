@@ -787,9 +787,9 @@ async def get_profile_avatar(current_user: auth.User = Depends(auth.get_current_
                 ct = "image/jpeg"
             elif ext == "webp":
                 ct = "image/webp"
-            return Response(content=avatar_path.read_bytes(), media_type=ct)
+            return Response(content=avatar_path.read_bytes(), media_type=ct, headers={"Cache-Control": "no-store"})
         auth.set_avatar_filename(current_user.id, "")
-    return Response(content=DEFAULT_AVATAR_SVG, media_type="image/svg+xml")
+    return Response(content=DEFAULT_AVATAR_SVG, media_type="image/svg+xml", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/admin/users_count")
