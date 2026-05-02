@@ -138,18 +138,31 @@
           <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
           搜索
         </h2>
-        <div class="flex flex-col sm:flex-row gap-2 mb-4">
-          <input id="searchQuery" class="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="全文搜索（例如：文言文 / 二次函数）">
-          <select id="searchCategory" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="">全部学科</option>
-          </select>
-          <div class="flex gap-2">
-            <button id="searchBtn" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">搜索</button>
-            <button id="clearSearchBtn" class="px-4 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm hover:bg-gray-200">清除</button>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2">
+            <div class="flex flex-col sm:flex-row gap-2 mb-4">
+              <input id="searchQuery" class="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="全文搜索（例如：文言文 / 二次函数）">
+              <select id="searchCategory" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">全部学科</option>
+              </select>
+              <div class="flex gap-2">
+                <button id="searchBtn" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">搜索</button>
+                <button id="clearSearchBtn" class="px-4 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm hover:bg-gray-200">清除</button>
+              </div>
+            </div>
+            <div id="search-results-2" class="hidden mb-4"></div>
+            <div class="text-sm text-gray-500">提示：点击“预览”将在右侧面板打开（桌面端）。</div>
           </div>
+          <aside id="search-preview" class="hidden lg:block lg:col-span-1">
+            <div class="sticky top-4 rounded-xl border border-gray-100 bg-gray-50 p-4">
+              <div class="flex items-center justify-between gap-2">
+                <div class="text-sm font-semibold text-gray-800" id="search-preview-title">预览</div>
+                <button id="searchPreviewClearBtn" class="text-xs text-gray-600 hover:text-gray-900">清空</button>
+              </div>
+              <div class="mt-3 text-sm text-gray-500" id="search-preview-body">选择一个搜索结果进行预览（桌面端）。</div>
+            </div>
+          </aside>
         </div>
-        <div id="search-results-2" class="hidden mb-4"></div>
-        <div class="text-sm text-gray-500">提示：搜索结果可直接“预览”打开内容。</div>
       </section>
 
       <section data-page="trash" class="hidden bg-white p-6 rounded-xl shadow-sm border border-gray-100">
@@ -369,6 +382,9 @@
     const libraryPreviewTitle = document.getElementById('library-preview-title')
     const libraryPreviewBody = document.getElementById('library-preview-body')
     const libraryPreviewClearBtn = document.getElementById('libraryPreviewClearBtn')
+    const searchPreviewTitle = document.getElementById('search-preview-title')
+    const searchPreviewBody = document.getElementById('search-preview-body')
+    const searchPreviewClearBtn = document.getElementById('searchPreviewClearBtn')
     const refreshBtn = document.getElementById('refreshBtn')
     const trashBtn = document.getElementById('trashBtn')
     const trashBtn2 = document.getElementById('trashBtn2')
@@ -1261,6 +1277,12 @@
       try { return window.matchMedia && window.matchMedia('(min-width: 1024px)').matches } catch (e) { return false }
     }
 
+    function getDesktopPreviewTarget(tab) {
+      if (tab === 'library' && libraryPreviewBody) return { titleEl: libraryPreviewTitle, bodyEl: libraryPreviewBody, empty: '选择一个文件进行预览（桌面端）。' }
+      if (tab === 'search' && searchPreviewBody) return { titleEl: searchPreviewTitle, bodyEl: searchPreviewBody, empty: '选择一个搜索结果进行预览（桌面端）。' }
+      return null
+    }
+
     function renderPreviewTo(el, base, category, filename, data) {
       if (!el) return
       if (data.type === 'text') {
@@ -1320,10 +1342,14 @@
           alert('预览失败: ' + (data && data.detail ? data.detail : String(response.status)))
           return
         }
-        if (isDesktopPreview() && libraryPreviewBody && parseTabFromHash() === 'library') {
-          if (libraryPreviewTitle) libraryPreviewTitle.textContent = data.filename || filename
-          renderPreviewTo(libraryPreviewBody, base, category, filename, data)
-          return
+        if (isDesktopPreview()) {
+          const tab = parseTabFromHash()
+          const target = getDesktopPreviewTarget(tab)
+          if (target && target.bodyEl) {
+            if (target.titleEl) target.titleEl.textContent = data.filename || filename
+            renderPreviewTo(target.bodyEl, base, category, filename, data)
+            return
+          }
         }
         modalTitle.textContent = data.filename || filename
         renderPreviewTo(modalContent, base, category, filename, data)
@@ -1553,6 +1579,23 @@
       libraryPreviewClearBtn.addEventListener('click', () => {
         if (libraryPreviewTitle) libraryPreviewTitle.textContent = '预览'
         if (libraryPreviewBody) libraryPreviewBody.textContent = '选择一个文件进行预览（桌面端）。'
+      })
+    }
+    if (searchPreviewBody) {
+      searchPreviewBody.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button')
+        if (!btn) return
+        if (btn.getAttribute('data-action') !== 'preview-derived') return
+        const category = btn.getAttribute('data-category') || ''
+        const filename = btn.getAttribute('data-filename') || ''
+        if (!category || !filename) return
+        await previewFile(category, filename)
+      })
+    }
+    if (searchPreviewClearBtn) {
+      searchPreviewClearBtn.addEventListener('click', () => {
+        if (searchPreviewTitle) searchPreviewTitle.textContent = '预览'
+        if (searchPreviewBody) searchPreviewBody.textContent = '选择一个搜索结果进行预览（桌面端）。'
       })
     }
     refreshBtn.addEventListener('click', () => { if (filterActive) applyFilters(); else loadStats() })
