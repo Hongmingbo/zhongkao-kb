@@ -83,7 +83,11 @@
                 <select id="filterExt" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                   <option value="">全部后缀</option>
                 </select>
-                <div class="flex gap-2">
+                <label class="flex items-center gap-2 px-3 py-2 border rounded-lg text-sm bg-white text-gray-700">
+                  <input id="filterFavorites" type="checkbox" class="h-4 w-4">
+                  <span>只看收藏</span>
+                </label>
+                <div class="flex gap-2 sm:col-span-2">
                   <button id="applyFiltersBtn" class="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">应用筛选</button>
                   <button id="clearFiltersBtn" class="flex-1 px-4 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm hover:bg-gray-200">清除筛选</button>
                 </div>
@@ -150,6 +154,10 @@
                 <button id="clearSearchBtn" class="px-4 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm hover:bg-gray-200">清除</button>
               </div>
             </div>
+            <label class="inline-flex items-center gap-2 text-sm text-gray-700 mb-3">
+              <input id="searchFavorites" type="checkbox" class="h-4 w-4">
+              <span>只看收藏</span>
+            </label>
             <div id="search-results-2" class="hidden mb-4"></div>
             <div class="text-sm text-gray-500">提示：点击“预览”将在右侧面板打开（桌面端）。</div>
           </div>
@@ -448,6 +456,8 @@
     const filterRegionSelect = document.getElementById('filterRegion')
     const filterTypeSelect = document.getElementById('filterType')
     const filterExtSelect = document.getElementById('filterExt')
+    const filterFavoritesCheckbox = document.getElementById('filterFavorites')
+    const searchFavoritesCheckbox = document.getElementById('searchFavorites')
     const applyFiltersBtn = document.getElementById('applyFiltersBtn')
     const clearFiltersBtn = document.getElementById('clearFiltersBtn')
     const searchResults = document.getElementById('search-results')
@@ -546,11 +556,12 @@
 
     function getToken() { return localStorage.getItem(TOKEN_KEY) || '' }
     function setToken(t) { localStorage.setItem(TOKEN_KEY, t) }
-    function clearToken() { localStorage.removeItem(TOKEN_KEY) }
+    function clearToken() { localStorage.removeItem(TOKEN_KEY); favorites.clear() }
 
     let avatarObjectUrl = ''
     const selectedKb = new Set()
     const selectedTrash = new Set()
+    const favorites = new Set()
     let categoriesCache = []
 
     function updateBulkBar() {
@@ -745,6 +756,64 @@
 
     function escapeAttr(unsafe) {
       return escapeHtml(unsafe).replace(/`/g, '&#096;')
+    }
+
+    function favoriteKey(category, filename) {
+      return String(category || '') + '::' + String(filename || '')
+    }
+
+    function isFavorited(category, filename) {
+      return favorites.has(favoriteKey(category, filename))
+    }
+
+    async function loadFavorites() {
+      favorites.clear()
+      try {
+        const r = await apiFetch('/api/favorites')
+        const data = await r.json().catch(() => ({}))
+        const items = (data && data.items) || []
+        if (r.ok && Array.isArray(items)) {
+          items.forEach(it => {
+            if (!it) return
+            const category = (it.category || '').trim()
+            const filename = (it.filename || '').trim()
+            if (!category || !filename) return
+            favorites.add(favoriteKey(category, filename))
+          })
+        }
+      } catch (e) {}
+    }
+
+    async function toggleFavorite(category, filename) {
+      try {
+        const r = await apiFetch('/api/favorites/toggle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category, filename }),
+        })
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok || (data && data.status) !== 'success') {
+          alert((data && data.detail) || '操作失败')
+          return
+        }
+        const favorited = !!data.favorited
+        const k = favoriteKey(category, filename)
+        if (favorited) favorites.add(k)
+        else favorites.delete(k)
+      } catch (e) {
+        alert('操作失败')
+        return
+      }
+
+      const tab = parseTabFromHash()
+      if (tab === 'search') {
+        await runSearch()
+        return
+      }
+      if (tab === 'library') {
+        if (filterActive) await applyFilters()
+        else await loadStats()
+      }
     }
 
     function renderDailyQuote(data) {
@@ -1058,20 +1127,28 @@
           return
         }
         let html = ''
+        let rendered = 0
         for (const [category, files] of Object.entries(data)) {
+          const onlyFav = !!(filterFavoritesCheckbox && filterFavoritesCheckbox.checked)
+          const filesToShow = onlyFav ? (files || []).filter(f => isFavorited(category, String(f && f.name || ''))) : (files || [])
+          if (!filesToShow.length) continue
+          rendered += 1
           html += `
             <div class="mb-4">
               <h3 class="text-md font-medium text-gray-700 flex items-center mb-2">
                 <svg class="w-4 h-4 mr-1 text-yellow-500" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path></svg>
-                ${escapeHtml(category)} <span class="ml-2 text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">${files.length}</span>
+                ${escapeHtml(category)} <span class="ml-2 text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">${filesToShow.length}</span>
               </h3>
               <ul class="pl-5 border-l-2 border-gray-100 ml-2 space-y-2">
-                ${files.map(f => {
+                ${filesToShow.map(f => {
                   const n = String(f.name || '')
                   const lower = n.toLowerCase()
                   const canSplit = !lower.endsWith('.questions.json') && (lower.endsWith('.md') || lower.endsWith('.txt') || lower.endsWith('.csv'))
                   const key = category + '::' + n
                   const checked = selectedKb.has(key) ? 'checked' : ''
+                  const fav = isFavorited(category, n)
+                  const favIcon = fav ? '★' : '☆'
+                  const favCls = fav ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-gray-600'
                   return `
                   <li class="text-sm text-gray-600 flex items-center justify-between group">
                     <div class="flex items-center before:content-[''] before:w-2 before:h-[1px] before:bg-gray-300 before:mr-2 before:-ml-5">
@@ -1080,6 +1157,7 @@
                       ${f.has_meta ? '<span class="ml-2 px-1.5 py-0.5 text-[10px] bg-blue-50 text-blue-500 rounded border border-blue-100">已提取标签</span>' : ''}
                     </div>
                     <div class="hidden group-hover:flex space-x-2">
+                      <button class="${favCls} text-xs" data-action="favorite" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}" aria-label="收藏">${favIcon}</button>
                       <button class="text-blue-500 hover:text-blue-700 text-xs" data-action="preview" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">预览</button>
                       ${canSplit ? `<button class="text-indigo-500 hover:text-indigo-700 text-xs" data-action="split" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">拆题</button>` : ''}
                       <button class="text-gray-700 hover:text-gray-900 text-xs" data-action="rename" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">重命名</button>
@@ -1092,7 +1170,7 @@
             </div>
           `
         }
-        kbStats.innerHTML = html
+        kbStats.innerHTML = rendered ? html : '<p class="text-gray-500 text-sm text-center py-8">没有匹配的文件。</p>'
         updateBulkBar()
       } catch (error) {
         kbStats.innerHTML = `<p class="text-red-500 text-sm">加载失败: ${escapeHtml(error && error.message ? error.message : String(error))}</p>`
@@ -1177,18 +1255,26 @@
         return
       }
       let html = ''
+      let rendered = 0
       for (const [category, files] of Object.entries(data)) {
+        const onlyFav = !!(filterFavoritesCheckbox && filterFavoritesCheckbox.checked)
+        const filesToShow = onlyFav ? (files || []).filter(f => isFavorited(category, String(f && f.name || ''))) : (files || [])
+        if (!filesToShow.length) continue
+        rendered += 1
         html += `
           <div class="mb-4">
             <h3 class="text-md font-medium text-gray-700 flex items-center mb-2">
               <svg class="w-4 h-4 mr-1 text-yellow-500" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path></svg>
-              ${escapeHtml(category)} <span class="ml-2 text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">${files.length}</span>
+              ${escapeHtml(category)} <span class="ml-2 text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">${filesToShow.length}</span>
             </h3>
             <ul class="pl-5 border-l-2 border-gray-100 ml-2 space-y-2">
-              ${files.map(f => {
+              ${filesToShow.map(f => {
                 const n = String(f.name || '')
                 const lower = n.toLowerCase()
                 const canSplit = !lower.endsWith('.questions.json') && (lower.endsWith('.md') || lower.endsWith('.txt') || lower.endsWith('.csv'))
+                const fav = isFavorited(category, n)
+                const favIcon = fav ? '★' : '☆'
+                const favCls = fav ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-gray-600'
                 return `
                 <li class="text-sm text-gray-600 flex items-center justify-between group">
                   <div class="flex items-center before:content-[''] before:w-2 before:h-[1px] before:bg-gray-300 before:mr-2 before:-ml-5">
@@ -1196,6 +1282,7 @@
                     ${f.has_meta ? '<span class="ml-2 px-1.5 py-0.5 text-[10px] bg-blue-50 text-blue-500 rounded border border-blue-100">已提取标签</span>' : ''}
                   </div>
                   <div class="hidden group-hover:flex space-x-2">
+                    <button class="${favCls} text-xs" data-action="favorite" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}" aria-label="收藏">${favIcon}</button>
                     <button class="text-blue-500 hover:text-blue-700 text-xs" data-action="preview" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">预览</button>
                     ${canSplit ? `<button class="text-indigo-500 hover:text-indigo-700 text-xs" data-action="split" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">拆题</button>` : ''}
                     <button class="text-red-500 hover:text-red-700 text-xs" data-action="delete" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">删除</button>
@@ -1207,7 +1294,7 @@
           </div>
         `
       }
-      kbStats.innerHTML = html
+      kbStats.innerHTML = rendered ? html : '<p class="text-gray-500 text-sm text-center py-8">没有匹配的文件。</p>'
     }
 
     async function runSearch() {
@@ -1254,20 +1341,25 @@
 
     function renderSearchResults(data) {
       const results = (data && data.results) || []
+      const onlyFav = !!(searchFavoritesCheckbox && searchFavoritesCheckbox.checked)
+      const resultsToShow = onlyFav ? results.filter(r => isFavorited(r.category || '', r.filename || '')) : results
       ;[searchResults, searchResults2].forEach(el => el && el.classList.remove('hidden'))
-      if (!results.length) {
+      if (!resultsToShow.length) {
         ;[searchResults, searchResults2].forEach(el => el && (el.innerHTML = '<p class="text-sm text-gray-500">未找到匹配结果。</p>'))
         kbStats.classList.add('hidden')
         return
       }
       kbStats.classList.add('hidden')
-      const items = results.map(r => {
+      const items = resultsToShow.map(r => {
         const matches = (r.matches || []).map(m => {
           const badge = m.where === 'filename'
             ? '<span class="px-1.5 py-0.5 text-[10px] bg-gray-100 text-gray-600 rounded border border-gray-200">文件名</span>'
             : '<span class="px-1.5 py-0.5 text-[10px] bg-blue-50 text-blue-600 rounded border border-blue-100">内容</span>'
           return `<div class="flex items-start gap-2 mt-1">${badge}<div class="text-xs text-gray-600 break-words">${escapeHtml(m.snippet || '')}</div></div>`
         }).join('')
+        const fav = isFavorited(r.category || '', r.filename || '')
+        const favIcon = fav ? '★' : '☆'
+        const favCls = fav ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-gray-600'
         return `
           <div class="p-3 rounded-lg border border-gray-100 bg-white">
             <div class="flex items-center justify-between gap-2">
@@ -1277,7 +1369,10 @@
                 <span>${escapeHtml(r.filename || '')}</span>
                 <span class="ml-2 text-xs text-gray-400">命中 ${r.count || 0}</span>
               </div>
-              <button class="text-blue-600 hover:text-blue-800 text-xs" data-action="preview" data-category="${escapeAttr(r.category || '')}" data-filename="${escapeAttr(r.filename || '')}">预览</button>
+              <div class="flex items-center gap-2">
+                <button class="${favCls} text-xs" data-action="favorite" data-category="${escapeAttr(r.category || '')}" data-filename="${escapeAttr(r.filename || '')}" aria-label="收藏">${favIcon}</button>
+                <button class="text-blue-600 hover:text-blue-800 text-xs" data-action="preview" data-category="${escapeAttr(r.category || '')}" data-filename="${escapeAttr(r.filename || '')}">预览</button>
+              </div>
             </div>
             ${matches}
           </div>
@@ -1294,6 +1389,7 @@
       const filename = btn.getAttribute('data-filename')
       if (!action || !category || !filename) return
       if (action === 'preview') await previewFile(category, filename)
+      if (action === 'favorite') await toggleFavorite(category, filename)
       if (action === 'split') await splitFile(category, filename)
       if (action === 'rename') await renameFile(category, filename)
       if (action === 'delete') await deleteFile(category, filename)
@@ -1359,6 +1455,7 @@
         const category = btn.getAttribute('data-category')
         const filename = btn.getAttribute('data-filename')
         if (action === 'preview' && category && filename) await previewFile(category, filename)
+        if (action === 'favorite' && category && filename) await toggleFavorite(category, filename)
       })
     }
     bindSearchResults(searchResults)
@@ -1919,8 +2016,10 @@
     searchBtn.addEventListener('click', runSearch)
     clearSearchBtn.addEventListener('click', clearSearch)
     searchQueryInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch() })
+    if (searchFavoritesCheckbox) searchFavoritesCheckbox.addEventListener('change', () => { void runSearch() })
     applyFiltersBtn.addEventListener('click', applyFilters)
     clearFiltersBtn.addEventListener('click', clearFilters)
+    if (filterFavoritesCheckbox) filterFavoritesCheckbox.addEventListener('change', () => { selectedKb.clear(); updateBulkBar(); if (filterActive) applyFilters(); else loadStats() })
     tabLoginBtn.addEventListener('click', () => setAuthTab(true))
     tabRegisterBtn.addEventListener('click', () => setAuthTab(false))
     closeAuthBtn.addEventListener('click', hideAuthModal)
@@ -1952,6 +2051,7 @@
           await loadAvatar()
         }
         hideAuthModal()
+        await loadFavorites()
         await loadStats()
       } catch (e) {
         setAuthMsg('登录失败', false)
@@ -2137,6 +2237,7 @@
           await loadAvatar()
           if (nicknameInputPage) nicknameInputPage.value = data.nickname ? data.nickname : data.username
           if (profileAvatarPreviewPage) profileAvatarPreviewPage.src = avatarImg.src || ''
+          await loadFavorites()
           await loadStats()
           return
         }
