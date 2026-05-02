@@ -1241,6 +1241,55 @@
     bindSearchResults(searchResults)
     bindSearchResults(searchResults2)
 
+    function renderPreviewTo(el, base, category, filename, data) {
+      if (!el) return
+      if (data.type === 'text') {
+        el.innerHTML = `<pre class="text-sm text-gray-700 whitespace-pre-wrap font-mono">${escapeHtml(data.content || '')}</pre>`
+        return
+      }
+
+      const ext = (data.ext || '').toLowerCase()
+      const rawUrl = data.raw_url ? (base + data.raw_url) : ''
+      const download = rawUrl ? `<a class="text-sm text-blue-600 hover:text-blue-800" href="${escapeAttr(rawUrl)}" target="_blank" rel="noopener">下载/打开原文件</a>` : ''
+      if (rawUrl && ['.png', '.jpg', '.jpeg', '.webp'].includes(ext)) {
+        el.innerHTML = `
+          <div class="space-y-3">
+            <div>${download}</div>
+            <img src="${escapeAttr(rawUrl)}" class="max-w-full rounded-lg border border-gray-200" alt="preview">
+          </div>
+        `
+        return
+      }
+      if (rawUrl && ext === '.pdf') {
+        el.innerHTML = `
+          <div class="space-y-3">
+            <div class="flex items-center justify-between gap-2">
+              <div>${download}</div>
+              <button class="text-sm px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200" data-action="preview-derived" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename + '.md')}">查看提取文本</button>
+            </div>
+            <iframe src="${escapeAttr(rawUrl)}" class="w-full h-[70vh] rounded-lg border border-gray-200 bg-white"></iframe>
+          </div>
+        `
+        return
+      }
+      if (ext === '.doc' || ext === '.docx') {
+        el.innerHTML = `
+          <div class="space-y-3">
+            <div>${download}</div>
+            <button class="text-sm px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200" data-action="preview-derived" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename + '.md')}">查看提取文本</button>
+            <p class="text-gray-500 italic">${escapeHtml(data.content || '')}</p>
+          </div>
+        `
+        return
+      }
+      el.innerHTML = `
+        <div class="space-y-3">
+          <div>${download}</div>
+          <p class="text-gray-500 italic">${escapeHtml(data.content || '')}</p>
+        </div>
+      `
+    }
+
     async function previewFile(category, filename) {
       const base = getApiBase()
       try {
@@ -1252,46 +1301,7 @@
           return
         }
         modalTitle.textContent = data.filename || filename
-        if (data.type === 'text') {
-          modalContent.innerHTML = `<pre class="text-sm text-gray-700 whitespace-pre-wrap font-mono">${escapeHtml(data.content || '')}</pre>`
-        } else {
-          const ext = (data.ext || '').toLowerCase()
-          const rawUrl = data.raw_url ? (base + data.raw_url) : ''
-          const download = rawUrl ? `<a class="text-sm text-blue-600 hover:text-blue-800" href="${escapeAttr(rawUrl)}" target="_blank" rel="noopener">下载/打开原文件</a>` : ''
-          if (rawUrl && ['.png', '.jpg', '.jpeg', '.webp'].includes(ext)) {
-            modalContent.innerHTML = `
-              <div class="space-y-3">
-                <div>${download}</div>
-                <img src="${escapeAttr(rawUrl)}" class="max-w-full rounded-lg border border-gray-200" alt="preview">
-              </div>
-            `
-          } else if (rawUrl && ext === '.pdf') {
-            modalContent.innerHTML = `
-              <div class="space-y-3">
-                <div class="flex items-center justify-between gap-2">
-                  <div>${download}</div>
-                  <button class="text-sm px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200" data-action="preview-derived" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename + '.md')}">查看提取文本</button>
-                </div>
-                <iframe src="${escapeAttr(rawUrl)}" class="w-full h-[70vh] rounded-lg border border-gray-200 bg-white"></iframe>
-              </div>
-            `
-          } else if (ext === '.doc' || ext === '.docx') {
-            modalContent.innerHTML = `
-              <div class="space-y-3">
-                <div>${download}</div>
-                <button class="text-sm px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200" data-action="preview-derived" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename + '.md')}">查看提取文本</button>
-                <p class="text-gray-500 italic">${escapeHtml(data.content || '')}</p>
-              </div>
-            `
-          } else {
-            modalContent.innerHTML = `
-              <div class="space-y-3">
-                <div>${download}</div>
-                <p class="text-gray-500 italic">${escapeHtml(data.content || '')}</p>
-              </div>
-            `
-          }
-        }
+        renderPreviewTo(modalContent, base, category, filename, data)
         previewModal.classList.remove('hidden')
       } catch (e) {
         alert('预览失败: ' + (e && e.message ? e.message : String(e)))
