@@ -118,6 +118,70 @@ def user_trash_dir(user_id: int) -> Path:
     return d
 
 
+def _favorites_path(user_id: int) -> Path:
+    return user_profile_dir(user_id) / "favorites.json"
+
+
+def _read_favorites(user_id: int) -> dict:
+    p = _favorites_path(user_id)
+    if not p.exists():
+        return {"items": []}
+    try:
+        data = json.loads(p.read_text(encoding="utf-8", errors="ignore") or "{}")
+    except Exception:
+        data = {}
+    items = data.get("items")
+    if not isinstance(items, list):
+        items = []
+    cleaned = []
+    seen = set()
+    for it in items[:5000]:
+        if not isinstance(it, dict):
+            continue
+        category = str(it.get("category") or "").strip()
+        filename = str(it.get("filename") or "").strip()
+        ts = it.get("ts")
+        if not category or not filename:
+            continue
+        k = category + "::" + filename
+        if k in seen:
+            continue
+        seen.add(k)
+        cleaned.append({"category": category, "filename": filename, "ts": int(ts) if isinstance(ts, int) else int(dt.datetime.now(dt.UTC).timestamp())})
+    return {"items": cleaned}
+
+
+def _write_favorites(user_id: int, data: dict):
+    p = _favorites_path(user_id)
+    p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _toggle_favorite(user_id: int, category: str, filename: str) -> bool:
+    validate_path_segment(category, "category")
+    validate_path_segment(filename, "filename")
+    data = _read_favorites(user_id)
+    items = list(data.get("items") or [])
+    k = category + "::" + filename
+    now_ts = int(dt.datetime.now(dt.UTC).timestamp())
+    out = []
+    removed = False
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        if (it.get("category") == category) and (it.get("filename") == filename):
+            removed = True
+            continue
+        out.append(it)
+    if removed:
+        data = {"items": out}
+        _write_favorites(user_id, data)
+        return False
+    out.insert(0, {"category": category, "filename": filename, "ts": now_ts})
+    data = {"items": out[:5000]}
+    _write_favorites(user_id, data)
+    return True
+
+
 def _trash_index_path(trash_dir: Path) -> Path:
     return trash_dir / "trash.json"
 
@@ -1315,6 +1379,21 @@ async def batch_rename_files(payload: dict = Body(...), current_user: auth.User 
                 {"ok": False, "category": category, "old_filename": old_filename, "new_filename": new_filename, "error": str(e)}
             )
     return {"status": "success", "results": results}
+
+
+@app.get("/api/favorites")
+async def get_favorites(current_user: auth.User = Depends(auth.get_current_user)):
+    return _read_favorites(current_user.id)
+
+
+@app.post("/api/favorites/toggle")
+async def toggle_favorite(payload: dict = Body(...), current_user: auth.User = Depends(auth.get_current_user)):
+    category = (payload.get("category") or "").strip()
+    filename = (payload.get("filename") or "").strip()
+    if not category or not filename:
+        raise HTTPException(status_code=400, detail="参数不完整")
+    favorited = _toggle_favorite(current_user.id, category, filename)
+    return {"status": "success", "favorited": favorited}
 
 
 @app.get("/api/trash")
