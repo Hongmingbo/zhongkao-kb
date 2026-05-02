@@ -1211,7 +1211,39 @@ async def get_file_content(
         content = file_path.read_text(encoding='utf-8', errors='ignore')
         return {"filename": filename, "content": content, "type": "text"}
     else:
-        return {"filename": filename, "content": "二进制文件，不支持直接预览", "type": "binary"}
+        return {
+            "filename": filename,
+            "content": "二进制文件，不支持直接预览",
+            "type": "binary",
+            "ext": ext,
+            "raw_url": f"/api/file/raw/{category}/{filename}",
+        }
+
+
+@app.get("/api/file/raw/{category}/{filename}")
+async def get_file_raw(
+    category: str,
+    filename: str,
+    current_user: auth.User = Depends(auth.get_current_user),
+):
+    validate_path_segment(category, "category")
+    validate_path_segment(filename, "filename")
+    kb_dir = user_kb_dir(current_user.id)
+    file_path = kb_dir / category / filename
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    ext = file_path.suffix.lower()
+    ct = "application/octet-stream"
+    if ext == ".png":
+        ct = "image/png"
+    elif ext in [".jpg", ".jpeg"]:
+        ct = "image/jpeg"
+    elif ext == ".webp":
+        ct = "image/webp"
+    elif ext == ".pdf":
+        ct = "application/pdf"
+    return Response(content=file_path.read_bytes(), media_type=ct, headers={"Cache-Control": "no-store"})
 
 # Feature 7: 在线文件删除
 @app.delete("/api/file/{category}/{filename}")

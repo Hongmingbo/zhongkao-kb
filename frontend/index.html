@@ -1182,7 +1182,42 @@
         if (data.type === 'text') {
           modalContent.innerHTML = `<pre class="text-sm text-gray-700 whitespace-pre-wrap font-mono">${escapeHtml(data.content || '')}</pre>`
         } else {
-          modalContent.innerHTML = `<p class="text-gray-500 italic">${escapeHtml(data.content || '')}</p>`
+          const ext = (data.ext || '').toLowerCase()
+          const rawUrl = data.raw_url ? (base + data.raw_url) : ''
+          const download = rawUrl ? `<a class="text-sm text-blue-600 hover:text-blue-800" href="${escapeAttr(rawUrl)}" target="_blank" rel="noopener">下载/打开原文件</a>` : ''
+          if (rawUrl && ['.png', '.jpg', '.jpeg', '.webp'].includes(ext)) {
+            modalContent.innerHTML = `
+              <div class="space-y-3">
+                <div>${download}</div>
+                <img src="${escapeAttr(rawUrl)}" class="max-w-full rounded-lg border border-gray-200" alt="preview">
+              </div>
+            `
+          } else if (rawUrl && ext === '.pdf') {
+            modalContent.innerHTML = `
+              <div class="space-y-3">
+                <div class="flex items-center justify-between gap-2">
+                  <div>${download}</div>
+                  <button class="text-sm px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200" data-action="preview-derived" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename + '.md')}">查看提取文本</button>
+                </div>
+                <iframe src="${escapeAttr(rawUrl)}" class="w-full h-[70vh] rounded-lg border border-gray-200 bg-white"></iframe>
+              </div>
+            `
+          } else if (ext === '.doc' || ext === '.docx') {
+            modalContent.innerHTML = `
+              <div class="space-y-3">
+                <div>${download}</div>
+                <button class="text-sm px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200" data-action="preview-derived" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename + '.md')}">查看提取文本</button>
+                <p class="text-gray-500 italic">${escapeHtml(data.content || '')}</p>
+              </div>
+            `
+          } else {
+            modalContent.innerHTML = `
+              <div class="space-y-3">
+                <div>${download}</div>
+                <p class="text-gray-500 italic">${escapeHtml(data.content || '')}</p>
+              </div>
+            `
+          }
         }
         previewModal.classList.remove('hidden')
       } catch (e) {
@@ -1386,6 +1421,15 @@
 
     closePreviewBtn.addEventListener('click', () => previewModal.classList.add('hidden'))
     previewModal.addEventListener('click', (e) => { if (e.target === previewModal) previewModal.classList.add('hidden') })
+    modalContent.addEventListener('click', async (e) => {
+      const btn = e.target.closest('button')
+      if (!btn) return
+      if (btn.getAttribute('data-action') !== 'preview-derived') return
+      const category = btn.getAttribute('data-category') || ''
+      const filename = btn.getAttribute('data-filename') || ''
+      if (!category || !filename) return
+      await previewFile(category, filename)
+    })
     refreshBtn.addEventListener('click', () => { if (filterActive) applyFilters(); else loadStats() })
     trashBtn.addEventListener('click', async () => { showTrashModal(); await loadTrash() })
     closeTrashBtn.addEventListener('click', hideTrashModal)

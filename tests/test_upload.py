@@ -64,3 +64,21 @@ def test_upload_pdf_keeps_original_and_creates_derived_md(tmp_path: Path, monkey
     base = kb_root / "u_1" / cat
     assert (base / "a.pdf").exists()
     assert (base / "a.pdf.md").exists()
+
+
+def test_file_raw_serves_png(tmp_path: Path, monkeypatch):
+    client = TestClient(main.app)
+    token = _create_user_and_token(client, monkeypatch, tmp_path, "u1")
+
+    kb_root = tmp_path / "kb"
+    kb_root.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(main, "KNOWLEDGE_BASE_DIR", kb_root)
+
+    base = kb_root / "u_1" / "语文"
+    base.mkdir(parents=True, exist_ok=True)
+    (base / "a.png").write_bytes(b"\x89PNG\r\n\x1a\nfake")
+
+    r = client.get("/api/file/raw/语文/a.png", headers={"Authorization": "Bearer " + token})
+    assert r.status_code == 200
+    assert (r.headers.get("content-type") or "").startswith("image/png")
+    assert "no-store" in (r.headers.get("cache-control") or "").lower()
