@@ -44,17 +44,33 @@
     .dragover { border-color: var(--primary) !important; background-color: rgba(37, 99, 235, 0.06) !important; }
     .card { background: var(--card); border: 1px solid var(--border); }
     .muted { color: var(--muted); }
+    @media (prefers-reduced-motion: reduce) {
+      .motion-safe { transition: none !important; }
+    }
+    .motion-safe { transition: transform .16s ease, box-shadow .16s ease, background-color .16s ease, border-color .16s ease, color .16s ease, opacity .16s ease; }
+    .btn { border-radius: .75rem; }
     .btn-primary { background: var(--primary); color: #fff; }
     .btn-primary:hover { background: var(--primary-2); }
     .btn-soft { background: rgba(148, 163, 184, 0.14); color: var(--text); border: 1px solid var(--border); }
     .btn-soft:hover { background: rgba(148, 163, 184, 0.22); }
+    .btn-accent { background: var(--accent); color: #001018; }
+    .btn-accent:hover { filter: brightness(0.95); }
     .btn-danger { background: #dc2626; color: #fff; }
     .btn-danger:hover { background: #b91c1c; }
+    .btn:active { transform: translateY(1px); }
     .focus-ring:focus { outline: none; box-shadow: 0 0 0 4px var(--ring); }
     .card-border { border: 1px solid var(--border); }
     .bg-card { background: var(--card); }
     .bg-soft { background: rgba(148,163,184,0.08); }
     .text-muted { color: var(--muted); }
+    .chip { display: inline-flex; align-items: center; gap: .25rem; padding: .125rem .5rem; border-radius: 999px; font-size: 10px; border: 1px solid var(--border); color: var(--muted); background: rgba(148,163,184,0.10); }
+    .chip-accent { border-color: rgba(6,182,212,0.35); color: var(--accent); background: rgba(6,182,212,0.10); }
+    .chip-warning { border-color: rgba(245,158,11,0.35); color: #f59e0b; background: rgba(245,158,11,0.10); }
+    .chip-danger { border-color: rgba(239,68,68,0.35); color: #ef4444; background: rgba(239,68,68,0.10); }
+    .card-hover:hover { transform: translateY(-1px); box-shadow: 0 12px 30px rgba(2,8,23,0.10); }
+    html[data-theme="dark"] .card-hover:hover { box-shadow: 0 12px 30px rgba(0,0,0,0.35); }
+    .star-hover:hover { transform: scale(1.08); }
+    .scroll-fade { -webkit-mask-image: linear-gradient(to bottom, transparent, #000 16px, #000 calc(100% - 16px), transparent); mask-image: linear-gradient(to bottom, transparent, #000 16px, #000 calc(100% - 16px), transparent); }
   </style>
 </head>
 <body class="min-h-screen font-sans">
@@ -68,7 +84,7 @@
         <div id="user-bar" class="hidden text-sm muted">
           <img id="avatarImg" class="w-9 h-9 rounded-full object-cover" style="border: 1px solid var(--border);" alt="avatar">
           <span id="current-user" class="ml-2 font-medium" style="color: var(--text);"></span>
-          <button id="themeToggleBtn" class="ml-3 btn-soft px-3 py-2 rounded-lg text-xs">深色</button>
+          <button id="themeToggleBtn" class="ml-3 btn btn-soft motion-safe px-3 py-2 rounded-lg text-xs">深色</button>
           <button id="settingsBtn" class="ml-2" style="color: var(--primary);">设置</button>
           <button id="logoutBtn" class="ml-3" style="color: #ef4444;">退出</button>
         </div>
@@ -137,8 +153,8 @@
                   <span>只看收藏</span>
                 </label>
                 <div class="flex gap-2 sm:col-span-2">
-                  <button id="applyFiltersBtn" class="flex-1 px-4 py-2 rounded-lg text-sm btn-primary">应用筛选</button>
-                  <button id="clearFiltersBtn" class="flex-1 px-4 py-2 rounded-lg text-sm btn-soft">清除筛选</button>
+                  <button id="applyFiltersBtn" class="flex-1 px-4 py-2 rounded-lg text-sm btn btn-primary motion-safe">应用筛选</button>
+                  <button id="clearFiltersBtn" class="flex-1 px-4 py-2 rounded-lg text-sm btn btn-soft motion-safe">清除筛选</button>
                 </div>
               </div>
             </div>
@@ -152,11 +168,11 @@
                 <select id="bulkTargetCategory" class="px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);">
                   <option value="">选择目标学科</option>
                 </select>
-                <button id="bulkCancelBtn" class="px-3 py-2 rounded-lg text-sm btn-soft">取消选择</button>
-                <button id="bulkTrashBtn" class="px-3 py-2 rounded-lg text-sm btn-primary">批量移入回收站</button>
-                <button id="bulkMoveBtn" class="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700">批量移动</button>
-                <button id="bulkMetaBtn" class="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700">批量改标签</button>
-                <button id="bulkBatchRenameBtn" class="px-3 py-2 rounded-lg bg-gray-800 text-white text-sm hover:bg-gray-900">批量重命名</button>
+                <button id="bulkCancelBtn" class="px-3 py-2 rounded-lg text-sm btn btn-soft motion-safe">取消选择</button>
+                <button id="bulkTrashBtn" class="px-3 py-2 rounded-lg text-sm btn btn-primary motion-safe">批量移入回收站</button>
+                <button id="bulkMoveBtn" class="px-3 py-2 rounded-lg text-sm btn btn-soft motion-safe">批量移动</button>
+                <button id="bulkMetaBtn" class="px-3 py-2 rounded-lg text-sm btn btn-accent motion-safe">批量改标签</button>
+                <button id="bulkBatchRenameBtn" class="px-3 py-2 rounded-lg text-sm btn btn-soft motion-safe">批量重命名</button>
               </div>
             </div>
             <div class="flex flex-wrap gap-4 mt-4">
@@ -177,10 +193,13 @@
           <aside id="library-preview" class="hidden lg:block lg:col-span-1">
             <div class="sticky top-4 rounded-xl p-4" style="border: 1px solid var(--border); background: rgba(148,163,184,0.08);">
               <div class="flex items-center justify-between gap-2">
-                <div class="text-sm font-semibold text-gray-800" id="library-preview-title">预览</div>
-                <button id="libraryPreviewClearBtn" class="text-xs text-gray-600 hover:text-gray-900">清空</button>
+                <div class="flex items-center gap-2 min-w-0">
+                  <div class="text-sm font-semibold truncate" style="color: var(--text);" id="library-preview-title">预览</div>
+                  <span id="library-preview-badge" class="chip">—</span>
+                </div>
+                <button id="libraryPreviewClearBtn" class="text-xs btn btn-soft motion-safe px-2 py-1 rounded-lg">清空</button>
               </div>
-              <div class="mt-3 text-sm muted" id="library-preview-body">选择一个文件进行预览（桌面端）。</div>
+              <div class="mt-3 text-sm muted max-h-[65vh] overflow-y-auto scroll-fade pr-1" id="library-preview-body">选择一个文件进行预览（桌面端）。</div>
             </div>
           </aside>
         </div>
@@ -199,8 +218,8 @@
                 <option value="">全部学科</option>
               </select>
               <div class="flex gap-2">
-                <button id="searchBtn" class="px-4 py-2 rounded-lg text-sm btn-primary">搜索</button>
-                <button id="clearSearchBtn" class="px-4 py-2 rounded-lg text-sm btn-soft">清除</button>
+                <button id="searchBtn" class="px-4 py-2 rounded-lg text-sm btn btn-primary motion-safe">搜索</button>
+                <button id="clearSearchBtn" class="px-4 py-2 rounded-lg text-sm btn btn-soft motion-safe">清除</button>
               </div>
             </div>
             <label class="inline-flex items-center gap-2 text-sm mb-3" style="color: var(--text);">
@@ -213,10 +232,13 @@
           <aside id="search-preview" class="hidden lg:block lg:col-span-1">
             <div class="sticky top-4 rounded-xl p-4" style="border: 1px solid var(--border); background: rgba(148,163,184,0.08);">
               <div class="flex items-center justify-between gap-2">
-                <div class="text-sm font-semibold text-gray-800" id="search-preview-title">预览</div>
-                <button id="searchPreviewClearBtn" class="text-xs text-gray-600 hover:text-gray-900">清空</button>
+                <div class="flex items-center gap-2 min-w-0">
+                  <div class="text-sm font-semibold truncate" style="color: var(--text);" id="search-preview-title">预览</div>
+                  <span id="search-preview-badge" class="chip">—</span>
+                </div>
+                <button id="searchPreviewClearBtn" class="text-xs btn btn-soft motion-safe px-2 py-1 rounded-lg">清空</button>
               </div>
-              <div class="mt-3 text-sm muted" id="search-preview-body">选择一个搜索结果进行预览（桌面端）。</div>
+              <div class="mt-3 text-sm muted max-h-[65vh] overflow-y-auto scroll-fade pr-1" id="search-preview-body">选择一个搜索结果进行预览（桌面端）。</div>
             </div>
           </aside>
         </div>
@@ -231,40 +253,40 @@
           <section class="rounded-xl p-4" style="border: 1px solid var(--border); background: var(--card);">
             <div class="flex items-start justify-between gap-3">
               <div>
-                <div class="text-sm font-semibold text-gray-800">回收站</div>
+              <div class="text-sm font-semibold" style="color: var(--text);">回收站</div>
                 <div class="text-xs mt-1 muted" id="trash-count-page">加载中...</div>
               </div>
               <button id="clearTrashBtnPage" class="px-3 py-2 rounded-lg bg-red-600 text-white text-xs hover:bg-red-700 whitespace-nowrap">清空回收站</button>
             </div>
             <div class="mt-3 flex flex-wrap gap-2">
-              <button id="trashRestoreSelectedBtnPage" class="px-3 py-2 rounded-lg text-xs btn-primary whitespace-nowrap">恢复已选</button>
-              <button id="trashPurgeSelectedBtnPage" class="px-3 py-2 rounded-lg bg-gray-100 text-gray-800 text-xs hover:bg-gray-200 whitespace-nowrap">删除已选</button>
-              <button id="trashClearSelectedBtnPage" class="px-3 py-2 rounded-lg text-xs btn-soft whitespace-nowrap">取消选择</button>
+              <button id="trashRestoreSelectedBtnPage" class="px-3 py-2 rounded-lg text-xs btn btn-primary motion-safe whitespace-nowrap">恢复已选</button>
+              <button id="trashPurgeSelectedBtnPage" class="px-3 py-2 rounded-lg text-xs btn btn-soft motion-safe whitespace-nowrap">删除已选</button>
+              <button id="trashClearSelectedBtnPage" class="px-3 py-2 rounded-lg text-xs btn btn-soft motion-safe whitespace-nowrap">取消选择</button>
             </div>
             <div id="trash-list-page" class="mt-4 max-h-[520px] overflow-y-auto"></div>
           </section>
 
           <section class="rounded-xl p-4" style="border: 1px solid var(--border); background: var(--card);" id="settings-panel">
-            <div class="text-sm font-semibold text-gray-800 mb-3">账号设置</div>
+            <div class="text-sm font-semibold mb-3" style="color: var(--text);">账号设置</div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <div class="text-sm font-medium mb-1" style="color: var(--text);">昵称</div>
                 <div class="space-y-2">
                   <input id="nicknameInputPage" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="昵称（1-20）">
                   <div class="flex justify-end">
-                    <button id="saveNicknameBtnPage" class="px-4 py-2 rounded-lg text-sm btn-primary">保存昵称</button>
+                    <button id="saveNicknameBtnPage" class="px-4 py-2 rounded-lg text-sm btn btn-primary motion-safe">保存昵称</button>
                   </div>
                 </div>
               </div>
               <div>
                 <div class="text-sm font-medium mb-1" style="color: var(--text);">头像</div>
                 <div class="flex items-start gap-3">
-                  <img id="profileAvatarPreviewPage" class="w-10 h-10 rounded-full object-cover border border-gray-200 shrink-0" alt="avatar">
+                  <img id="profileAvatarPreviewPage" class="w-10 h-10 rounded-full object-cover shrink-0" style="border: 1px solid var(--border);" alt="avatar">
                   <div class="flex-1 min-w-0 space-y-2">
                     <input id="avatarFilePage" type="file" accept="image/png,image/jpeg,image/webp" class="block w-full text-xs text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200">
                     <div class="text-xs muted leading-tight">支持 png/jpg/webp，最大 2MB</div>
                     <div class="flex justify-end">
-                      <button id="uploadAvatarBtnPage" class="px-4 py-2 rounded-lg text-sm btn-primary">上传头像</button>
+                      <button id="uploadAvatarBtnPage" class="px-4 py-2 rounded-lg text-sm btn btn-primary motion-safe">上传头像</button>
                     </div>
                   </div>
                 </div>
@@ -277,7 +299,7 @@
                   <input id="newPassword2InputPage" type="password" class="px-3 py-2 border rounded-lg text-sm" placeholder="确认新密码">
                 </div>
                 <div class="mt-2 flex justify-end">
-                  <button id="changePasswordBtnPage" class="px-4 py-2 rounded-lg text-sm btn-primary">保存密码</button>
+                  <button id="changePasswordBtnPage" class="px-4 py-2 rounded-lg text-sm btn btn-primary motion-safe">保存密码</button>
                 </div>
               </div>
             </div>
@@ -291,7 +313,7 @@
       <div id="trash-modal" class="fixed inset-0 z-50 hidden bg-gray-900 bg-opacity-50 flex items-center justify-center p-4">
     <div class="bg-card rounded-xl shadow-lg w-full max-w-3xl max-h-[80vh] flex flex-col card-border">
       <div class="flex items-center justify-between p-4 card-border border-b">
-        <div class="text-lg font-semibold text-gray-800">回收站</div>
+        <div class="text-lg font-semibold" style="color: var(--text);">回收站</div>
         <button id="closeTrash" class="text-gray-400 hover:text-gray-600 focus:outline-none">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
@@ -299,10 +321,10 @@
       <div class="p-4 card-border border-b flex items-center justify-between gap-2">
         <div class="text-sm text-muted" id="trash-count">加载中...</div>
         <div class="flex gap-2">
-          <button id="trashRestoreSelectedBtn" class="px-3 py-2 rounded-lg text-sm btn-primary">恢复已选</button>
-          <button id="trashPurgeSelectedBtn" class="px-3 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm hover:bg-gray-200">删除已选</button>
-          <button id="trashClearSelectedBtn" class="px-3 py-2 rounded-lg text-sm btn-soft">取消选择</button>
-          <button id="clearTrashBtn" class="px-3 py-2 rounded-lg text-sm btn-danger">清空回收站</button>
+          <button id="trashRestoreSelectedBtn" class="px-3 py-2 rounded-lg text-sm btn btn-primary motion-safe">恢复已选</button>
+          <button id="trashPurgeSelectedBtn" class="px-3 py-2 rounded-lg text-sm btn btn-soft motion-safe">删除已选</button>
+          <button id="trashClearSelectedBtn" class="px-3 py-2 rounded-lg text-sm btn btn-soft motion-safe">取消选择</button>
+          <button id="clearTrashBtn" class="px-3 py-2 rounded-lg text-sm btn btn-danger motion-safe">清空回收站</button>
         </div>
       </div>
       <div id="trash-list" class="p-4 overflow-y-auto flex-1"></div>
@@ -323,7 +345,7 @@
         <input id="metaRegionInput" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="地区（例如 北京）">
         <input id="metaTypeInput" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="类型（例如 真题/模拟/专题）">
         <div class="flex justify-end gap-2">
-          <button id="metaApplyBtn" class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700">应用到已选文件</button>
+          <button id="metaApplyBtn" class="px-4 py-2 rounded-lg text-sm btn btn-accent motion-safe">应用到已选文件</button>
         </div>
         <div id="meta-msg" class="text-sm"></div>
       </div>
@@ -342,7 +364,7 @@
         <div class="text-xs muted" id="rename-hint"></div>
         <input id="renameInput" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="新文件名（包含后缀）">
         <div class="flex justify-end gap-2">
-          <button id="renameApplyBtn" class="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm hover:bg-gray-900">确认重命名</button>
+          <button id="renameApplyBtn" class="px-4 py-2 rounded-lg text-sm btn btn-primary motion-safe">确认重命名</button>
         </div>
         <div id="rename-msg" class="text-sm"></div>
       </div>
@@ -371,7 +393,7 @@
           <input id="brStart" class="w-24 px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="起始" value="1">
         </div>
         <div class="flex justify-end gap-2">
-          <button id="brApplyBtn" class="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm hover:bg-gray-900">执行批量重命名</button>
+          <button id="brApplyBtn" class="px-4 py-2 rounded-lg text-sm btn btn-primary motion-safe">执行批量重命名</button>
         </div>
         <div id="br-msg" class="text-sm"></div>
       </div>
@@ -400,15 +422,15 @@
       </div>
       <div class="p-4">
         <div class="flex gap-2 mb-4">
-          <button id="tabLogin" class="flex-1 px-3 py-2 rounded-lg text-sm btn-primary">登录</button>
-          <button id="tabRegister" class="flex-1 px-3 py-2 rounded-lg text-sm btn-soft">注册</button>
+          <button id="tabLogin" class="flex-1 px-3 py-2 rounded-lg text-sm btn btn-primary motion-safe">登录</button>
+          <button id="tabRegister" class="flex-1 px-3 py-2 rounded-lg text-sm btn btn-soft motion-safe">注册</button>
         </div>
 
         <div id="login-panel">
           <div class="space-y-3">
             <input id="loginUsername" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="用户名">
             <input id="loginPassword" type="password" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="密码">
-            <button id="loginBtn" class="w-full px-4 py-2 rounded-lg text-sm btn-primary">登录</button>
+            <button id="loginBtn" class="w-full px-4 py-2 rounded-lg text-sm btn btn-primary motion-safe">登录</button>
           </div>
         </div>
 
@@ -417,7 +439,7 @@
             <input id="inviteCode" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="邀请码">
             <input id="registerUsername" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="用户名">
             <input id="registerPassword" type="password" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="密码">
-            <button id="registerBtn" class="w-full px-4 py-2 rounded-lg text-sm btn-primary">注册</button>
+            <button id="registerBtn" class="w-full px-4 py-2 rounded-lg text-sm btn btn-primary motion-safe">注册</button>
           </div>
         </div>
 
@@ -439,7 +461,7 @@
           <div class="text-sm font-medium mb-1" style="color: var(--text);">昵称</div>
           <div class="flex gap-2">
             <input id="nicknameInput" class="flex-1 px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="请输入昵称（1-20字）">
-            <button id="saveNicknameBtn" class="px-4 py-2 rounded-lg text-sm btn-primary">保存</button>
+            <button id="saveNicknameBtn" class="px-4 py-2 rounded-lg text-sm btn btn-primary motion-safe">保存</button>
           </div>
         </div>
         <div>
@@ -452,7 +474,7 @@
             </div>
           </div>
           <div class="mt-2 flex justify-end">
-            <button id="uploadAvatarBtn" class="px-4 py-2 rounded-lg text-sm btn-primary">上传头像</button>
+            <button id="uploadAvatarBtn" class="px-4 py-2 rounded-lg text-sm btn btn-primary motion-safe">上传头像</button>
           </div>
         </div>
         <div>
@@ -462,7 +484,7 @@
             <input id="newPasswordInput" type="password" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="新密码（至少6位）">
             <input id="newPassword2Input" type="password" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="确认新密码">
             <div class="flex justify-end">
-              <button id="changePasswordBtn" class="px-4 py-2 rounded-lg text-sm btn-primary">保存密码</button>
+              <button id="changePasswordBtn" class="px-4 py-2 rounded-lg text-sm btn btn-primary motion-safe">保存密码</button>
             </div>
           </div>
         </div>
@@ -481,9 +503,11 @@
     const libraryPreviewTitle = document.getElementById('library-preview-title')
     const libraryPreviewBody = document.getElementById('library-preview-body')
     const libraryPreviewClearBtn = document.getElementById('libraryPreviewClearBtn')
+    const libraryPreviewBadge = document.getElementById('library-preview-badge')
     const searchPreviewTitle = document.getElementById('search-preview-title')
     const searchPreviewBody = document.getElementById('search-preview-body')
     const searchPreviewClearBtn = document.getElementById('searchPreviewClearBtn')
+    const searchPreviewBadge = document.getElementById('search-preview-badge')
     const refreshBtn = document.getElementById('refreshBtn')
     const trashBtn = document.getElementById('trashBtn')
     const trashBtn2 = document.getElementById('trashBtn2')
@@ -779,13 +803,13 @@
 
     function setAuthTab(isLogin) {
       if (isLogin) {
-        tabLoginBtn.className = 'flex-1 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm'
-        tabRegisterBtn.className = 'flex-1 px-3 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm'
+        tabLoginBtn.className = 'flex-1 px-3 py-2 rounded-lg text-sm btn btn-primary motion-safe'
+        tabRegisterBtn.className = 'flex-1 px-3 py-2 rounded-lg text-sm btn btn-soft motion-safe'
         loginPanel.classList.remove('hidden')
         registerPanel.classList.add('hidden')
       } else {
-        tabLoginBtn.className = 'flex-1 px-3 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm'
-        tabRegisterBtn.className = 'flex-1 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm'
+        tabLoginBtn.className = 'flex-1 px-3 py-2 rounded-lg text-sm btn btn-soft motion-safe'
+        tabRegisterBtn.className = 'flex-1 px-3 py-2 rounded-lg text-sm btn btn-primary motion-safe'
         loginPanel.classList.add('hidden')
         registerPanel.classList.remove('hidden')
       }
@@ -971,23 +995,23 @@
       uploadQueueEl.classList.remove('hidden')
 
       const badge = (status) => {
-        if (status === 'queued') return '<span class="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded border border-gray-200">等待</span>'
-        if (status === 'uploading') return '<span class="px-2 py-0.5 text-xs bg-blue-50 text-blue-700 rounded border border-blue-100">上传中</span>'
-        if (status === 'success') return '<span class="px-2 py-0.5 text-xs bg-green-50 text-green-700 rounded border border-green-200">成功</span>'
-        return '<span class="px-2 py-0.5 text-xs bg-red-50 text-red-700 rounded border border-red-200">失败</span>'
+        if (status === 'queued') return '<span class="chip">等待</span>'
+        if (status === 'uploading') return '<span class="chip chip-accent">上传中</span>'
+        if (status === 'success') return '<span class="chip chip-warning">成功</span>'
+        return '<span class="chip chip-danger">失败</span>'
       }
 
       const rows = uploadQueue.map(item => {
         const right = item.status === 'success' && item.category
-          ? `<span class="ml-2 px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded">${escapeHtml(item.category)}</span>`
+          ? `<span class="ml-2 chip chip-warning">${escapeHtml(item.category)}</span>`
           : item.status === 'error' && item.message
             ? `<span class="ml-2 text-xs text-red-600 break-words">${escapeHtml(item.message)}</span>`
             : ''
 
         return `
-          <div class="flex items-start justify-between gap-2 py-2 border-b border-gray-100 last:border-b-0">
+          <div class="flex items-start justify-between gap-2 py-2" style="border-bottom: 1px solid var(--border);">
             <div class="min-w-0">
-              <div class="text-sm text-gray-800 truncate" title="${escapeAttr(item.name)}">${escapeHtml(item.name)}</div>
+              <div class="text-sm truncate" style="color: var(--text);" title="${escapeAttr(item.name)}">${escapeHtml(item.name)}</div>
               <div class="mt-1 flex items-center gap-2">${badge(item.status)}${right}</div>
             </div>
           </div>
@@ -995,8 +1019,8 @@
       }).join('')
 
       uploadQueueEl.innerHTML = `
-        <div class="rounded-lg border border-gray-100 bg-white">
-          <div class="px-3 py-2 border-b border-gray-100 text-sm font-medium text-gray-700">批量上传队列</div>
+        <div class="rounded-lg card-border bg-card">
+          <div class="px-3 py-2 card-border border-b text-sm font-medium" style="color: var(--text);">批量上传队列</div>
           <div class="px-3">${rows}</div>
         </div>
       `
@@ -1110,17 +1134,17 @@
         const html = `
           <div class="space-y-2">
             ${items.map(it => `
-              <div class="p-3 rounded-lg border border-gray-200 bg-white flex items-center justify-between gap-3">
+          <div class="p-3 rounded-lg flex items-center justify-between gap-3 card-border bg-card motion-safe card-hover">
                 <div class="min-w-0 flex items-start gap-3">
                   <input type="checkbox" class="mt-1 h-4 w-4" data-trash-select="1" data-id="${escapeAttr(it.id || '')}" ${selectedTrash.has(it.id) ? 'checked' : ''}>
                   <div class="min-w-0">
-                    <div class="text-sm font-medium text-gray-800 truncate" title="${escapeHtml(it.filename || '')}">${escapeHtml(it.filename || '')}</div>
-                    <div class="text-xs text-gray-500 mt-1">原位置：${escapeHtml(it.category || '')} · 删除时间：${escapeHtml(formatTime(it.deleted_at))}</div>
+              <div class="text-sm font-medium truncate" style="color: var(--text);" title="${escapeHtml(it.filename || '')}">${escapeHtml(it.filename || '')}</div>
+                    <div class="text-xs muted mt-1">原位置：${escapeHtml(it.category || '')} · 删除时间：${escapeHtml(formatTime(it.deleted_at))}</div>
                   </div>
                 </div>
                 <div class="flex gap-2 shrink-0">
-                  <button class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs hover:bg-blue-700" data-action="trash-restore" data-id="${escapeAttr(it.id || '')}">恢复</button>
-                  <button class="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-800 text-xs hover:bg-gray-200" data-action="trash-delete" data-id="${escapeAttr(it.id || '')}">彻底删除</button>
+              <button class="px-3 py-1.5 rounded-lg text-xs btn btn-primary motion-safe" data-action="trash-restore" data-id="${escapeAttr(it.id || '')}">恢复</button>
+              <button class="px-3 py-1.5 rounded-lg text-xs btn btn-soft motion-safe" data-action="trash-delete" data-id="${escapeAttr(it.id || '')}">彻底删除</button>
                 </div>
               </div>
             `).join('')}
@@ -1209,11 +1233,11 @@
           rendered += 1
           html += `
             <div class="mb-4">
-              <h3 class="text-md font-medium text-gray-700 flex items-center mb-2">
+              <h3 class="text-md font-medium flex items-center mb-2" style="color: var(--text);">
                 <svg class="w-4 h-4 mr-1 text-yellow-500" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path></svg>
-                ${escapeHtml(category)} <span class="ml-2 text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">${filesToShow.length}</span>
+                ${escapeHtml(category)} <span class="ml-2 text-xs chip">${filesToShow.length}</span>
               </h3>
-              <ul class="pl-5 border-l-2 border-gray-100 ml-2 space-y-2">
+              <ul class="pl-5 ml-2 space-y-2" style="border-left: 2px solid var(--border);">
                 ${filesToShow.map(f => {
                   const n = String(f.name || '')
                   const lower = n.toLowerCase()
@@ -1228,13 +1252,13 @@
                     <div class="flex items-center before:content-[''] before:w-2 before:h-[1px] before:bg-gray-300 before:mr-2 before:-ml-5">
                       <input type="checkbox" class="mr-2 h-4 w-4" data-kb-select="1" data-key="${escapeAttr(key)}" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(n)}" ${checked}>
                       <span class="truncate max-w-[220px]" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
-                      ${f.has_meta ? '<span class="ml-2 px-1.5 py-0.5 text-[10px] bg-blue-50 text-blue-500 rounded border border-blue-100">已提取标签</span>' : ''}
+                      ${f.has_meta ? '<span class="ml-2 chip chip-accent">已提取标签</span>' : ''}
                     </div>
                     <div class="hidden group-hover:flex space-x-2">
-                      <button class="${favCls} text-xs" data-action="favorite" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}" aria-label="收藏">${favIcon}</button>
+                      <button class="${favCls} text-xs motion-safe star-hover" data-action="favorite" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}" aria-label="收藏">${favIcon}</button>
                       <button class="text-blue-500 hover:text-blue-700 text-xs" data-action="preview" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">预览</button>
                       ${canSplit ? `<button class="text-indigo-500 hover:text-indigo-700 text-xs" data-action="split" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">拆题</button>` : ''}
-                      <button class="text-gray-700 hover:text-gray-900 text-xs" data-action="rename" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">重命名</button>
+                      <button class="text-xs" style="color: var(--muted);" data-action="rename" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">重命名</button>
                       <button class="text-red-500 hover:text-red-700 text-xs" data-action="delete" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">删除</button>
                     </div>
                   </li>
@@ -1337,11 +1361,11 @@
         rendered += 1
         html += `
           <div class="mb-4">
-            <h3 class="text-md font-medium text-gray-700 flex items-center mb-2">
+            <h3 class="text-md font-medium flex items-center mb-2" style="color: var(--text);">
               <svg class="w-4 h-4 mr-1 text-yellow-500" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path></svg>
-              ${escapeHtml(category)} <span class="ml-2 text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">${filesToShow.length}</span>
+              ${escapeHtml(category)} <span class="ml-2 text-xs chip">${filesToShow.length}</span>
             </h3>
-            <ul class="pl-5 border-l-2 border-gray-100 ml-2 space-y-2">
+            <ul class="pl-5 ml-2 space-y-2" style="border-left: 2px solid var(--border);">
               ${filesToShow.map(f => {
                 const n = String(f.name || '')
                 const lower = n.toLowerCase()
@@ -1353,10 +1377,10 @@
                 <li class="text-sm text-gray-600 flex items-center justify-between group">
                   <div class="flex items-center before:content-[''] before:w-2 before:h-[1px] before:bg-gray-300 before:mr-2 before:-ml-5">
                     <span class="truncate max-w-[220px]" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
-                    ${f.has_meta ? '<span class="ml-2 px-1.5 py-0.5 text-[10px] bg-blue-50 text-blue-500 rounded border border-blue-100">已提取标签</span>' : ''}
+                    ${f.has_meta ? '<span class="ml-2 chip chip-accent">已提取标签</span>' : ''}
                   </div>
                   <div class="hidden group-hover:flex space-x-2">
-                    <button class="${favCls} text-xs" data-action="favorite" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}" aria-label="收藏">${favIcon}</button>
+                    <button class="${favCls} text-xs motion-safe star-hover" data-action="favorite" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}" aria-label="收藏">${favIcon}</button>
                     <button class="text-blue-500 hover:text-blue-700 text-xs" data-action="preview" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">预览</button>
                     ${canSplit ? `<button class="text-indigo-500 hover:text-indigo-700 text-xs" data-action="split" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">拆题</button>` : ''}
                     <button class="text-red-500 hover:text-red-700 text-xs" data-action="delete" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">删除</button>
@@ -1427,25 +1451,25 @@
       const items = resultsToShow.map(r => {
         const matches = (r.matches || []).map(m => {
           const badge = m.where === 'filename'
-            ? '<span class="px-1.5 py-0.5 text-[10px] bg-gray-100 text-gray-600 rounded border border-gray-200">文件名</span>'
-            : '<span class="px-1.5 py-0.5 text-[10px] bg-blue-50 text-blue-600 rounded border border-blue-100">内容</span>'
+            ? '<span class="chip">文件名</span>'
+            : '<span class="chip chip-accent">内容</span>'
           return `<div class="flex items-start gap-2 mt-1">${badge}<div class="text-xs text-gray-600 break-words">${escapeHtml(m.snippet || '')}</div></div>`
         }).join('')
         const fav = isFavorited(r.category || '', r.filename || '')
         const favIcon = fav ? '★' : '☆'
         const favCls = fav ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-gray-600'
         return `
-          <div class="p-3 rounded-lg border border-gray-100 bg-white">
+          <div class="p-3 rounded-lg card-border bg-card motion-safe card-hover">
             <div class="flex items-center justify-between gap-2">
-              <div class="text-sm text-gray-800">
+              <div class="text-sm" style="color: var(--text);">
                 <span class="font-medium">${escapeHtml(r.category || '')}</span>
                 <span class="text-gray-400 mx-1">/</span>
                 <span>${escapeHtml(r.filename || '')}</span>
                 <span class="ml-2 text-xs text-gray-400">命中 ${r.count || 0}</span>
               </div>
               <div class="flex items-center gap-2">
-                <button class="${favCls} text-xs" data-action="favorite" data-category="${escapeAttr(r.category || '')}" data-filename="${escapeAttr(r.filename || '')}" aria-label="收藏">${favIcon}</button>
-                <button class="text-blue-600 hover:text-blue-800 text-xs" data-action="preview" data-category="${escapeAttr(r.category || '')}" data-filename="${escapeAttr(r.filename || '')}">预览</button>
+                <button class="${favCls} text-xs motion-safe star-hover" data-action="favorite" data-category="${escapeAttr(r.category || '')}" data-filename="${escapeAttr(r.filename || '')}" aria-label="收藏">${favIcon}</button>
+                <button class="text-xs" style="color: var(--primary);" data-action="preview" data-category="${escapeAttr(r.category || '')}" data-filename="${escapeAttr(r.filename || '')}">预览</button>
               </div>
             </div>
             ${matches}
@@ -1545,21 +1569,31 @@
       return null
     }
 
+    function previewBadgeInfo(name) {
+      const n = String(name || '').toLowerCase()
+      const ext = n.includes('.') ? ('.' + n.split('.').pop()) : ''
+      if (ext === '.pdf') return { text: 'PDF', cls: 'chip chip-accent' }
+      if (['.png', '.jpg', '.jpeg', '.webp'].includes(ext)) return { text: 'IMG', cls: 'chip chip-warning' }
+      if (['.txt', '.md', '.csv', '.json'].includes(ext)) return { text: 'TXT', cls: 'chip' }
+      if (['.doc', '.docx'].includes(ext)) return { text: 'DOCX', cls: 'chip' }
+      return { text: ext ? ext.replace('.', '').toUpperCase() : 'FILE', cls: 'chip' }
+    }
+
     function renderPreviewTo(el, base, category, filename, data) {
       if (!el) return
       if (data.type === 'text') {
-        el.innerHTML = `<pre class="text-sm text-gray-700 whitespace-pre-wrap font-mono">${escapeHtml(data.content || '')}</pre>`
+        el.innerHTML = `<pre class="text-sm whitespace-pre-wrap font-mono" style="color: var(--text);">${escapeHtml(data.content || '')}</pre>`
         return
       }
 
       const ext = (data.ext || '').toLowerCase()
       const rawUrl = data.raw_url ? (base + data.raw_url) : ''
-      const download = rawUrl ? `<a class="text-sm text-blue-600 hover:text-blue-800" href="${escapeAttr(rawUrl)}" target="_blank" rel="noopener">下载/打开原文件</a>` : ''
+      const download = rawUrl ? `<a class="text-sm" style="color: var(--primary);" href="${escapeAttr(rawUrl)}" target="_blank" rel="noopener">下载/打开原文件</a>` : ''
       if (rawUrl && ['.png', '.jpg', '.jpeg', '.webp'].includes(ext)) {
         el.innerHTML = `
           <div class="space-y-3">
             <div>${download}</div>
-            <img src="${escapeAttr(rawUrl)}" class="max-w-full rounded-lg border border-gray-200" alt="preview">
+            <img src="${escapeAttr(rawUrl)}" class="max-w-full rounded-lg card-border bg-card" alt="preview">
           </div>
         `
         return
@@ -1569,9 +1603,9 @@
           <div class="space-y-3">
             <div class="flex items-center justify-between gap-2">
               <div>${download}</div>
-              <button class="text-sm px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200" data-action="preview-derived" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename + '.md')}">查看提取文本</button>
+              <button class="text-sm px-3 py-2 rounded-lg btn btn-soft motion-safe" data-action="preview-derived" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename + '.md')}">查看提取文本</button>
             </div>
-            <iframe src="${escapeAttr(rawUrl)}" class="w-full h-[70vh] rounded-lg border border-gray-200 bg-white"></iframe>
+            <iframe src="${escapeAttr(rawUrl)}" class="w-full h-[70vh] rounded-lg card-border bg-card"></iframe>
           </div>
         `
         return
@@ -1580,8 +1614,8 @@
         el.innerHTML = `
           <div class="space-y-3">
             <div>${download}</div>
-            <button class="text-sm px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200" data-action="preview-derived" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename + '.md')}">查看提取文本</button>
-            <p class="text-gray-500 italic">${escapeHtml(data.content || '')}</p>
+            <button class="text-sm px-3 py-2 rounded-lg btn btn-soft motion-safe" data-action="preview-derived" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename + '.md')}">查看提取文本</button>
+            <p class="muted italic">${escapeHtml(data.content || '')}</p>
           </div>
         `
         return
@@ -1589,7 +1623,7 @@
       el.innerHTML = `
         <div class="space-y-3">
           <div>${download}</div>
-          <p class="text-gray-500 italic">${escapeHtml(data.content || '')}</p>
+          <p class="muted italic">${escapeHtml(data.content || '')}</p>
         </div>
       `
     }
@@ -1608,7 +1642,11 @@
           const tab = parseTabFromHash()
           const target = getDesktopPreviewTarget(tab)
           if (target && target.bodyEl) {
-            if (target.titleEl) target.titleEl.textContent = data.filename || filename
+            const shownName = data.filename || filename
+            if (target.titleEl) target.titleEl.textContent = shownName
+            const info = previewBadgeInfo(shownName)
+            const badgeEl = tab === 'library' ? libraryPreviewBadge : (tab === 'search' ? searchPreviewBadge : null)
+            if (badgeEl) { badgeEl.className = info.cls; badgeEl.textContent = info.text }
             renderPreviewTo(target.bodyEl, base, category, filename, data)
             return
           }
@@ -1656,9 +1694,9 @@
             ? `<ul class="mt-2 list-disc pl-5 space-y-1">${opts.map(o => `<li>${escapeHtml(o)}</li>`).join('')}</ul>`
             : ''
           return `
-            <div class="p-3 rounded-lg border border-gray-200 bg-white">
-              <div class="text-sm font-semibold text-gray-800">第 ${escapeHtml(it.id || '')} 题</div>
-              <div class="mt-2 text-sm text-gray-700 whitespace-pre-wrap">${escapeHtml(it.stem || '')}</div>
+            <div class="p-3 rounded-lg card-border bg-card motion-safe card-hover">
+              <div class="text-sm font-semibold" style="color: var(--text);">第 ${escapeHtml(it.id || '')} 题</div>
+              <div class="mt-2 text-sm whitespace-pre-wrap" style="color: var(--text);">${escapeHtml(it.stem || '')}</div>
               ${optHtml}
             </div>
           `
@@ -1669,8 +1707,8 @@
         modalTitle.textContent = `拆题结果：${filename}`
         modalContent.innerHTML = `
           <div class="mb-4 flex items-center justify-between gap-2">
-            <div class="text-sm text-gray-600">共 ${items.length} 题（预览前 10 题）</div>
-            <a class="text-sm text-blue-600 hover:text-blue-800" href="${url}" download="${escapeAttr(outName || 'questions.json')}">下载 JSON</a>
+            <div class="text-sm muted">共 ${items.length} 题（预览前 10 题）</div>
+            <a class="text-sm" style="color: var(--primary);" href="${url}" download="${escapeAttr(outName || 'questions.json')}">下载 JSON</a>
           </div>
           <div class="space-y-3">${showItems || '<p class="text-sm text-gray-500">未识别到题目。</p>'}</div>
         `
@@ -1840,6 +1878,7 @@
     if (libraryPreviewClearBtn) {
       libraryPreviewClearBtn.addEventListener('click', () => {
         if (libraryPreviewTitle) libraryPreviewTitle.textContent = '预览'
+        if (libraryPreviewBadge) { libraryPreviewBadge.className = 'chip'; libraryPreviewBadge.textContent = '—' }
         if (libraryPreviewBody) libraryPreviewBody.textContent = '选择一个文件进行预览（桌面端）。'
       })
     }
@@ -1857,6 +1896,7 @@
     if (searchPreviewClearBtn) {
       searchPreviewClearBtn.addEventListener('click', () => {
         if (searchPreviewTitle) searchPreviewTitle.textContent = '预览'
+        if (searchPreviewBadge) { searchPreviewBadge.className = 'chip'; searchPreviewBadge.textContent = '—' }
         if (searchPreviewBody) searchPreviewBody.textContent = '选择一个搜索结果进行预览（桌面端）。'
       })
     }
