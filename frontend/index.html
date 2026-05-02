@@ -71,6 +71,9 @@
     html[data-theme="dark"] .card-hover:hover { box-shadow: 0 12px 30px rgba(0,0,0,0.35); }
     .star-hover:hover { transform: scale(1.08); }
     .scroll-fade { -webkit-mask-image: linear-gradient(to bottom, transparent, #000 16px, #000 calc(100% - 16px), transparent); mask-image: linear-gradient(to bottom, transparent, #000 16px, #000 calc(100% - 16px), transparent); }
+    .brand-title { background: linear-gradient(90deg, var(--primary), var(--accent)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .brand-bar { height: 2px; width: 11.5rem; border-radius: 999px; background: linear-gradient(90deg, rgba(37,99,235,0.60), rgba(6,182,212,0.60)); }
+    html[data-theme="dark"] .brand-bar { background: linear-gradient(90deg, rgba(96,165,250,0.45), rgba(34,211,238,0.45)); }
   </style>
 </head>
 <body class="min-h-screen font-sans">
@@ -78,7 +81,8 @@
     <header class="mb-6">
       <div class="flex items-center justify-between gap-4">
         <div>
-          <h1 class="text-3xl sm:text-4xl font-bold tracking-tight" style="color: var(--primary);">中考知识库</h1>
+          <h1 class="text-3xl sm:text-4xl font-bold tracking-tight brand-title">中考知识库</h1>
+          <div class="brand-bar mt-2"></div>
           <div id="daily-quote" class="text-sm mt-1 muted"></div>
         </div>
         <div id="user-bar" class="hidden text-sm muted">
