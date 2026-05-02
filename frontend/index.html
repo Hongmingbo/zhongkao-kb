@@ -6,48 +6,97 @@
   <title>中考知识库（前端）</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    .dragover { border-color: #3b82f6 !important; background-color: #eff6ff !important; }
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --muted: #64748b;
+      --text: #0f172a;
+      --border: #e2e8f0;
+      --primary: #2563eb;
+      --primary-2: #1d4ed8;
+      --accent: #06b6d4;
+      --ring: rgba(37, 99, 235, 0.35);
+    }
+    html[data-theme="dark"] {
+      --bg: #0b1220;
+      --card: #0f172a;
+      --muted: #94a3b8;
+      --text: #e2e8f0;
+      --border: rgba(148, 163, 184, 0.16);
+      --primary: #60a5fa;
+      --primary-2: #93c5fd;
+      --accent: #22d3ee;
+      --ring: rgba(34, 211, 238, 0.28);
+    }
+    body {
+      background:
+        radial-gradient(900px circle at 20% -10%, rgba(6, 182, 212, 0.12), transparent 60%),
+        radial-gradient(900px circle at 90% 10%, rgba(37, 99, 235, 0.12), transparent 60%),
+        var(--bg);
+      color: var(--text);
+    }
+    html[data-theme="dark"] body {
+      background:
+        radial-gradient(900px circle at 20% -10%, rgba(34, 211, 238, 0.12), transparent 60%),
+        radial-gradient(900px circle at 90% 10%, rgba(96, 165, 250, 0.14), transparent 60%),
+        var(--bg);
+    }
+    .dragover { border-color: var(--primary) !important; background-color: rgba(37, 99, 235, 0.06) !important; }
+    .card { background: var(--card); border: 1px solid var(--border); }
+    .muted { color: var(--muted); }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-2); }
+    .btn-soft { background: rgba(148, 163, 184, 0.14); color: var(--text); border: 1px solid var(--border); }
+    .btn-soft:hover { background: rgba(148, 163, 184, 0.22); }
+    .btn-danger { background: #dc2626; color: #fff; }
+    .btn-danger:hover { background: #b91c1c; }
+    .focus-ring:focus { outline: none; box-shadow: 0 0 0 4px var(--ring); }
+    .card-border { border: 1px solid var(--border); }
+    .bg-card { background: var(--card); }
+    .bg-soft { background: rgba(148,163,184,0.08); }
+    .text-muted { color: var(--muted); }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen text-gray-800 font-sans">
+<body class="min-h-screen font-sans">
   <div class="max-w-5xl mx-auto py-10 px-4">
     <header class="mb-6">
       <div class="flex items-center justify-between gap-4">
         <div>
-          <h1 class="text-3xl sm:text-4xl font-bold tracking-tight text-blue-600">中考知识库</h1>
-          <div id="daily-quote" class="text-gray-500 text-sm mt-1"></div>
+          <h1 class="text-3xl sm:text-4xl font-bold tracking-tight" style="color: var(--primary);">中考知识库</h1>
+          <div id="daily-quote" class="text-sm mt-1 muted"></div>
         </div>
-        <div id="user-bar" class="hidden text-sm text-gray-600">
-          <img id="avatarImg" class="w-9 h-9 rounded-full object-cover border border-gray-200" alt="avatar">
-          <span id="current-user" class="ml-2 font-medium text-gray-800"></span>
-          <button id="settingsBtn" class="ml-3 text-blue-600 hover:text-blue-800">设置</button>
-          <button id="logoutBtn" class="ml-3 text-red-600 hover:text-red-700">退出</button>
+        <div id="user-bar" class="hidden text-sm muted">
+          <img id="avatarImg" class="w-9 h-9 rounded-full object-cover" style="border: 1px solid var(--border);" alt="avatar">
+          <span id="current-user" class="ml-2 font-medium" style="color: var(--text);"></span>
+          <button id="themeToggleBtn" class="ml-3 btn-soft px-3 py-2 rounded-lg text-xs">深色</button>
+          <button id="settingsBtn" class="ml-2" style="color: var(--primary);">设置</button>
+          <button id="logoutBtn" class="ml-3" style="color: #ef4444;">退出</button>
         </div>
       </div>
-      <nav class="mt-5 flex items-center gap-2 border-b border-gray-200">
-        <button data-tab="upload" class="px-4 py-2 -mb-px text-sm font-medium border-b-2 border-blue-600 text-blue-700">上传</button>
-        <button data-tab="library" class="px-4 py-2 -mb-px text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300">知识库</button>
-        <button data-tab="search" class="px-4 py-2 -mb-px text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300">搜索</button>
-        <button data-tab="trash" class="px-4 py-2 -mb-px text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300">回收站与设置</button>
+      <nav class="mt-5 flex items-center gap-2" style="border-bottom: 1px solid var(--border);">
+        <button data-tab="upload" class="px-4 py-2 -mb-px text-sm font-medium">上传</button>
+        <button data-tab="library" class="px-4 py-2 -mb-px text-sm font-medium">知识库</button>
+        <button data-tab="search" class="px-4 py-2 -mb-px text-sm font-medium">搜索</button>
+        <button data-tab="trash" class="px-4 py-2 -mb-px text-sm font-medium">回收站与设置</button>
       </nav>
     </header>
 
     <main class="space-y-6">
-      <section data-page="upload" class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+      <section data-page="upload" class="card p-6 rounded-xl shadow-sm">
         <h2 class="text-xl font-semibold mb-4 flex items-center">
           <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
           上传文件
         </h2>
 
-        <div id="drop-zone" class="relative border-2 border-dashed border-gray-300 rounded-lg p-10 text-center transition-colors duration-200 hover:border-blue-400 hover:bg-gray-50">
+        <div id="drop-zone" class="relative rounded-lg p-10 text-center transition-colors duration-200" style="border: 2px dashed var(--border);">
           <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
             <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
           </svg>
           <div class="mt-4 flex text-sm text-gray-600 justify-center">
-            <span class="relative bg-white rounded-md font-medium text-blue-600">选择文件</span>
+            <span class="relative bg-white rounded-md font-medium" style="color: var(--primary);">选择文件</span>
             <p class="pl-1">或拖拽文件到这里</p>
           </div>
-          <p class="text-xs text-gray-500 mt-2">支持 txt, md, pdf, docx, jpg, zip 批量上传等</p>
+          <p class="text-xs mt-2 muted">支持 txt, md, pdf, docx, jpg, zip 批量上传等</p>
           <input id="file-upload" name="file-upload" type="file" multiple class="absolute inset-0 opacity-0 cursor-pointer">
         </div>
 
@@ -58,53 +107,53 @@
         </div>
       </section>
 
-      <section data-page="library" class="hidden bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+      <section data-page="library" class="hidden card p-6 rounded-xl shadow-sm">
         <h2 class="text-xl font-semibold mb-4 flex items-center">
           <svg class="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
           知识库结构
         </h2>
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div class="lg:col-span-2">
-            <div class="rounded-lg border border-gray-100 bg-white p-3 mb-4">
-              <div class="text-sm font-medium text-gray-700 mb-2">筛选面板</div>
+            <div class="rounded-lg p-3 mb-4" style="border: 1px solid var(--border); background: var(--card);">
+              <div class="text-sm font-medium mb-2" style="color: var(--text);">筛选面板</div>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <select id="filterCategory" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <select id="filterCategory" class="px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);">
                   <option value="">全部学科</option>
                 </select>
-                <select id="filterYear" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <select id="filterYear" class="px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);">
                   <option value="">全部年份</option>
                 </select>
-                <select id="filterRegion" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <select id="filterRegion" class="px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);">
                   <option value="">全部地区</option>
                 </select>
-                <select id="filterType" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <select id="filterType" class="px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);">
                   <option value="">全部类型</option>
                 </select>
-                <select id="filterExt" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <select id="filterExt" class="px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);">
                   <option value="">全部后缀</option>
                 </select>
-                <label class="flex items-center gap-2 px-3 py-2 border rounded-lg text-sm bg-white text-gray-700">
+                <label class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style="border: 1px solid var(--border); background: var(--card); color: var(--text);">
                   <input id="filterFavorites" type="checkbox" class="h-4 w-4">
                   <span>只看收藏</span>
                 </label>
                 <div class="flex gap-2 sm:col-span-2">
-                  <button id="applyFiltersBtn" class="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">应用筛选</button>
-                  <button id="clearFiltersBtn" class="flex-1 px-4 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm hover:bg-gray-200">清除筛选</button>
+                  <button id="applyFiltersBtn" class="flex-1 px-4 py-2 rounded-lg text-sm btn-primary">应用筛选</button>
+                  <button id="clearFiltersBtn" class="flex-1 px-4 py-2 rounded-lg text-sm btn-soft">清除筛选</button>
                 </div>
               </div>
             </div>
             <div id="search-results" class="hidden mb-4"></div>
             <div id="kb-stats" class="space-y-4 max-h-[520px] overflow-y-auto">
-              <p class="text-gray-500 text-sm">加载中...</p>
+              <p class="text-sm muted">加载中...</p>
             </div>
-            <div id="bulk-bar" class="hidden mt-4 p-3 rounded-lg border border-blue-100 bg-blue-50 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2">
-              <div class="text-sm text-blue-900"><span id="bulk-count">已选择 0 个</span></div>
+            <div id="bulk-bar" class="hidden mt-4 p-3 rounded-lg flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2" style="border: 1px solid rgba(6,182,212,0.25); background: rgba(6,182,212,0.06);">
+              <div class="text-sm" style="color: var(--text);"><span id="bulk-count">已选择 0 个</span></div>
               <div class="flex flex-wrap gap-2">
-                <select id="bulkTargetCategory" class="px-3 py-2 rounded-lg bg-white text-gray-800 text-sm border border-gray-200">
+                <select id="bulkTargetCategory" class="px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);">
                   <option value="">选择目标学科</option>
                 </select>
-                <button id="bulkCancelBtn" class="px-3 py-2 rounded-lg bg-white text-gray-800 text-sm border border-gray-200 hover:bg-gray-50">取消选择</button>
-                <button id="bulkTrashBtn" class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">批量移入回收站</button>
+                <button id="bulkCancelBtn" class="px-3 py-2 rounded-lg text-sm btn-soft">取消选择</button>
+                <button id="bulkTrashBtn" class="px-3 py-2 rounded-lg text-sm btn-primary">批量移入回收站</button>
                 <button id="bulkMoveBtn" class="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700">批量移动</button>
                 <button id="bulkMetaBtn" class="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700">批量改标签</button>
                 <button id="bulkBatchRenameBtn" class="px-3 py-2 rounded-lg bg-gray-800 text-white text-sm hover:bg-gray-900">批量重命名</button>
@@ -115,29 +164,29 @@
                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                 刷新目录
               </button>
-              <button id="trashBtn" class="text-sm text-gray-700 hover:text-gray-900 flex items-center">
+          <button id="trashBtn" class="text-sm flex items-center" style="color: var(--muted);">
                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14"></path></svg>
                 回收站
               </button>
-              <button id="clearBtn" class="text-sm text-red-500 hover:text-red-700 flex items-center">
+          <button id="clearBtn" class="text-sm flex items-center" style="color: #ef4444;">
                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                 清空知识库
               </button>
             </div>
           </div>
           <aside id="library-preview" class="hidden lg:block lg:col-span-1">
-            <div class="sticky top-4 rounded-xl border border-gray-100 bg-gray-50 p-4">
+            <div class="sticky top-4 rounded-xl p-4" style="border: 1px solid var(--border); background: rgba(148,163,184,0.08);">
               <div class="flex items-center justify-between gap-2">
                 <div class="text-sm font-semibold text-gray-800" id="library-preview-title">预览</div>
                 <button id="libraryPreviewClearBtn" class="text-xs text-gray-600 hover:text-gray-900">清空</button>
               </div>
-              <div class="mt-3 text-sm text-gray-500" id="library-preview-body">选择一个文件进行预览（桌面端）。</div>
+              <div class="mt-3 text-sm muted" id="library-preview-body">选择一个文件进行预览（桌面端）。</div>
             </div>
           </aside>
         </div>
       </section>
 
-      <section data-page="search" class="hidden bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+      <section data-page="search" class="hidden card p-6 rounded-xl shadow-sm">
         <h2 class="text-xl font-semibold mb-4 flex items-center">
           <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
           搜索
@@ -145,90 +194,90 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div class="lg:col-span-2">
             <div class="flex flex-col sm:flex-row gap-2 mb-4">
-              <input id="searchQuery" class="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="全文搜索（例如：文言文 / 二次函数）">
-              <select id="searchCategory" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <input id="searchQuery" class="flex-1 px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="全文搜索（例如：文言文 / 二次函数）">
+              <select id="searchCategory" class="px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);">
                 <option value="">全部学科</option>
               </select>
               <div class="flex gap-2">
-                <button id="searchBtn" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">搜索</button>
-                <button id="clearSearchBtn" class="px-4 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm hover:bg-gray-200">清除</button>
+                <button id="searchBtn" class="px-4 py-2 rounded-lg text-sm btn-primary">搜索</button>
+                <button id="clearSearchBtn" class="px-4 py-2 rounded-lg text-sm btn-soft">清除</button>
               </div>
             </div>
-            <label class="inline-flex items-center gap-2 text-sm text-gray-700 mb-3">
+            <label class="inline-flex items-center gap-2 text-sm mb-3" style="color: var(--text);">
               <input id="searchFavorites" type="checkbox" class="h-4 w-4">
               <span>只看收藏</span>
             </label>
             <div id="search-results-2" class="hidden mb-4"></div>
-            <div class="text-sm text-gray-500">提示：点击“预览”将在右侧面板打开（桌面端）。</div>
+            <div class="text-sm muted">提示：点击“预览”将在右侧面板打开（桌面端）。</div>
           </div>
           <aside id="search-preview" class="hidden lg:block lg:col-span-1">
-            <div class="sticky top-4 rounded-xl border border-gray-100 bg-gray-50 p-4">
+            <div class="sticky top-4 rounded-xl p-4" style="border: 1px solid var(--border); background: rgba(148,163,184,0.08);">
               <div class="flex items-center justify-between gap-2">
                 <div class="text-sm font-semibold text-gray-800" id="search-preview-title">预览</div>
                 <button id="searchPreviewClearBtn" class="text-xs text-gray-600 hover:text-gray-900">清空</button>
               </div>
-              <div class="mt-3 text-sm text-gray-500" id="search-preview-body">选择一个搜索结果进行预览（桌面端）。</div>
+              <div class="mt-3 text-sm muted" id="search-preview-body">选择一个搜索结果进行预览（桌面端）。</div>
             </div>
           </aside>
         </div>
       </section>
 
-      <section data-page="trash" class="hidden bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+      <section data-page="trash" class="hidden card p-6 rounded-xl shadow-sm">
         <h2 class="text-xl font-semibold mb-4 flex items-center">
-          <svg class="w-5 h-5 mr-2 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14"></path></svg>
+          <svg class="w-5 h-5 mr-2" style="color: var(--muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14"></path></svg>
           回收站与设置
         </h2>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <section class="rounded-xl border border-gray-100 bg-white p-4">
+          <section class="rounded-xl p-4" style="border: 1px solid var(--border); background: var(--card);">
             <div class="flex items-start justify-between gap-3">
               <div>
                 <div class="text-sm font-semibold text-gray-800">回收站</div>
-                <div class="text-xs text-gray-500 mt-1" id="trash-count-page">加载中...</div>
+                <div class="text-xs mt-1 muted" id="trash-count-page">加载中...</div>
               </div>
               <button id="clearTrashBtnPage" class="px-3 py-2 rounded-lg bg-red-600 text-white text-xs hover:bg-red-700 whitespace-nowrap">清空回收站</button>
             </div>
             <div class="mt-3 flex flex-wrap gap-2">
-              <button id="trashRestoreSelectedBtnPage" class="px-3 py-2 rounded-lg bg-blue-600 text-white text-xs hover:bg-blue-700 whitespace-nowrap">恢复已选</button>
+              <button id="trashRestoreSelectedBtnPage" class="px-3 py-2 rounded-lg text-xs btn-primary whitespace-nowrap">恢复已选</button>
               <button id="trashPurgeSelectedBtnPage" class="px-3 py-2 rounded-lg bg-gray-100 text-gray-800 text-xs hover:bg-gray-200 whitespace-nowrap">删除已选</button>
-              <button id="trashClearSelectedBtnPage" class="px-3 py-2 rounded-lg bg-white text-gray-800 text-xs border border-gray-200 hover:bg-gray-50 whitespace-nowrap">取消选择</button>
+              <button id="trashClearSelectedBtnPage" class="px-3 py-2 rounded-lg text-xs btn-soft whitespace-nowrap">取消选择</button>
             </div>
             <div id="trash-list-page" class="mt-4 max-h-[520px] overflow-y-auto"></div>
           </section>
 
-          <section class="rounded-xl border border-gray-100 bg-white p-4" id="settings-panel">
+          <section class="rounded-xl p-4" style="border: 1px solid var(--border); background: var(--card);" id="settings-panel">
             <div class="text-sm font-semibold text-gray-800 mb-3">账号设置</div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <div class="text-sm font-medium text-gray-700 mb-1">昵称</div>
+                <div class="text-sm font-medium mb-1" style="color: var(--text);">昵称</div>
                 <div class="space-y-2">
                   <input id="nicknameInputPage" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="昵称（1-20）">
                   <div class="flex justify-end">
-                    <button id="saveNicknameBtnPage" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">保存昵称</button>
+                    <button id="saveNicknameBtnPage" class="px-4 py-2 rounded-lg text-sm btn-primary">保存昵称</button>
                   </div>
                 </div>
               </div>
               <div>
-                <div class="text-sm font-medium text-gray-700 mb-1">头像</div>
+                <div class="text-sm font-medium mb-1" style="color: var(--text);">头像</div>
                 <div class="flex items-start gap-3">
                   <img id="profileAvatarPreviewPage" class="w-10 h-10 rounded-full object-cover border border-gray-200 shrink-0" alt="avatar">
                   <div class="flex-1 min-w-0 space-y-2">
                     <input id="avatarFilePage" type="file" accept="image/png,image/jpeg,image/webp" class="block w-full text-xs text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200">
-                    <div class="text-xs text-gray-500 leading-tight">支持 png/jpg/webp，最大 2MB</div>
+                    <div class="text-xs muted leading-tight">支持 png/jpg/webp，最大 2MB</div>
                     <div class="flex justify-end">
-                      <button id="uploadAvatarBtnPage" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">上传头像</button>
+                      <button id="uploadAvatarBtnPage" class="px-4 py-2 rounded-lg text-sm btn-primary">上传头像</button>
                     </div>
                   </div>
                 </div>
               </div>
               <div class="sm:col-span-2">
-                <div class="text-sm font-medium text-gray-700 mb-1">修改密码</div>
+                <div class="text-sm font-medium mb-1" style="color: var(--text);">修改密码</div>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <input id="oldPasswordInputPage" type="password" class="px-3 py-2 border rounded-lg text-sm" placeholder="旧密码">
                   <input id="newPasswordInputPage" type="password" class="px-3 py-2 border rounded-lg text-sm" placeholder="新密码（至少6位）">
                   <input id="newPassword2InputPage" type="password" class="px-3 py-2 border rounded-lg text-sm" placeholder="确认新密码">
                 </div>
                 <div class="mt-2 flex justify-end">
-                  <button id="changePasswordBtnPage" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">保存密码</button>
+                  <button id="changePasswordBtnPage" class="px-4 py-2 rounded-lg text-sm btn-primary">保存密码</button>
                 </div>
               </div>
             </div>
@@ -239,21 +288,21 @@
     </main>
   </div>
 
-  <div id="trash-modal" class="fixed inset-0 z-50 hidden bg-gray-900 bg-opacity-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-lg w-full max-w-3xl max-h-[80vh] flex flex-col">
-      <div class="flex items-center justify-between p-4 border-b border-gray-100">
+      <div id="trash-modal" class="fixed inset-0 z-50 hidden bg-gray-900 bg-opacity-50 flex items-center justify-center p-4">
+    <div class="bg-card rounded-xl shadow-lg w-full max-w-3xl max-h-[80vh] flex flex-col card-border">
+      <div class="flex items-center justify-between p-4 card-border border-b">
         <div class="text-lg font-semibold text-gray-800">回收站</div>
         <button id="closeTrash" class="text-gray-400 hover:text-gray-600 focus:outline-none">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
       </div>
-      <div class="p-4 border-b border-gray-100 flex items-center justify-between gap-2">
-        <div class="text-sm text-gray-600" id="trash-count">加载中...</div>
+      <div class="p-4 card-border border-b flex items-center justify-between gap-2">
+        <div class="text-sm text-muted" id="trash-count">加载中...</div>
         <div class="flex gap-2">
-          <button id="trashRestoreSelectedBtn" class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">恢复已选</button>
+          <button id="trashRestoreSelectedBtn" class="px-3 py-2 rounded-lg text-sm btn-primary">恢复已选</button>
           <button id="trashPurgeSelectedBtn" class="px-3 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm hover:bg-gray-200">删除已选</button>
-          <button id="trashClearSelectedBtn" class="px-3 py-2 rounded-lg bg-white text-gray-800 text-sm border border-gray-200 hover:bg-gray-50">取消选择</button>
-          <button id="clearTrashBtn" class="px-3 py-2 rounded-lg bg-red-600 text-white text-sm hover:bg-red-700">清空回收站</button>
+          <button id="trashClearSelectedBtn" class="px-3 py-2 rounded-lg text-sm btn-soft">取消选择</button>
+          <button id="clearTrashBtn" class="px-3 py-2 rounded-lg text-sm btn-danger">清空回收站</button>
         </div>
       </div>
       <div id="trash-list" class="p-4 overflow-y-auto flex-1"></div>
@@ -261,18 +310,18 @@
   </div>
 
   <div id="meta-modal" class="fixed inset-0 z-50 hidden bg-gray-900 bg-opacity-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-lg w-full max-w-md">
-      <div class="p-4 border-b border-gray-100 flex items-center justify-between">
-        <div class="text-lg font-semibold text-gray-800">批量改标签</div>
+    <div class="bg-card rounded-xl shadow-lg w-full max-w-md card-border">
+      <div class="p-4 flex items-center justify-between card-border border-b">
+        <div class="text-lg font-semibold" style="color: var(--text);">批量改标签</div>
         <button id="closeMeta" class="text-gray-400 hover:text-gray-600 focus:outline-none">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
       </div>
       <div class="p-4 space-y-3">
-        <div class="text-xs text-gray-500">留空则不修改该字段</div>
-        <input id="metaYearInput" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="年份（例如 2024）">
-        <input id="metaRegionInput" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="地区（例如 北京）">
-        <input id="metaTypeInput" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="类型（例如 真题/模拟/专题）">
+        <div class="text-xs muted">留空则不修改该字段</div>
+        <input id="metaYearInput" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="年份（例如 2024）">
+        <input id="metaRegionInput" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="地区（例如 北京）">
+        <input id="metaTypeInput" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="类型（例如 真题/模拟/专题）">
         <div class="flex justify-end gap-2">
           <button id="metaApplyBtn" class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700">应用到已选文件</button>
         </div>
@@ -282,16 +331,16 @@
   </div>
 
   <div id="rename-modal" class="fixed inset-0 z-50 hidden bg-gray-900 bg-opacity-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-lg w-full max-w-md">
-      <div class="p-4 border-b border-gray-100 flex items-center justify-between">
-        <div class="text-lg font-semibold text-gray-800">重命名</div>
+    <div class="bg-card rounded-xl shadow-lg w-full max-w-md card-border">
+      <div class="p-4 flex items-center justify-between card-border border-b">
+        <div class="text-lg font-semibold" style="color: var(--text);">重命名</div>
         <button id="closeRename" class="text-gray-400 hover:text-gray-600 focus:outline-none">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
       </div>
       <div class="p-4 space-y-3">
-        <div class="text-xs text-gray-500" id="rename-hint"></div>
-        <input id="renameInput" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="新文件名（包含后缀）">
+        <div class="text-xs muted" id="rename-hint"></div>
+        <input id="renameInput" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="新文件名（包含后缀）">
         <div class="flex justify-end gap-2">
           <button id="renameApplyBtn" class="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm hover:bg-gray-900">确认重命名</button>
         </div>
@@ -301,25 +350,25 @@
   </div>
 
   <div id="batch-rename-modal" class="fixed inset-0 z-50 hidden bg-gray-900 bg-opacity-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-lg w-full max-w-xl">
-      <div class="p-4 border-b border-gray-100 flex items-center justify-between">
-        <div class="text-lg font-semibold text-gray-800">批量重命名</div>
+    <div class="bg-card rounded-xl shadow-lg w-full max-w-xl card-border">
+      <div class="p-4 flex items-center justify-between card-border border-b">
+        <div class="text-lg font-semibold" style="color: var(--text);">批量重命名</div>
         <button id="closeBatchRename" class="text-gray-400 hover:text-gray-600 focus:outline-none">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
       </div>
       <div class="p-4 space-y-3">
-        <div class="text-xs text-gray-500">仅修改文件名（保留原扩展名）；同名冲突会自动加 -renamed-时间戳</div>
+        <div class="text-xs muted">仅修改文件名（保留原扩展名）；同名冲突会自动加 -renamed-时间戳</div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <input id="brFind" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="查找（可空）">
-          <input id="brReplace" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="替换为（可空）">
-          <input id="brPrefix" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="前缀（可空）">
-          <input id="brSuffix" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="后缀（可空）">
+          <input id="brFind" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="查找（可空）">
+          <input id="brReplace" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="替换为（可空）">
+          <input id="brPrefix" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="前缀（可空）">
+          <input id="brSuffix" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="后缀（可空）">
         </div>
         <div class="flex items-center gap-2">
           <input id="brEnableNumber" type="checkbox" class="h-4 w-4">
-          <div class="text-sm text-gray-700">编号序列（001/002…）</div>
-          <input id="brStart" class="w-24 px-3 py-2 border rounded-lg text-sm" placeholder="起始" value="1">
+          <div class="text-sm" style="color: var(--text);">编号序列（001/002…）</div>
+          <input id="brStart" class="w-24 px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="起始" value="1">
         </div>
         <div class="flex justify-end gap-2">
           <button id="brApplyBtn" class="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm hover:bg-gray-900">执行批量重命名</button>
@@ -330,45 +379,45 @@
   </div>
 
   <div id="preview-modal" class="fixed inset-0 z-50 hidden bg-gray-900 bg-opacity-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-lg w-full max-w-3xl max-h-[80vh] flex flex-col">
-      <div class="flex items-center justify-between p-4 border-b border-gray-100">
-        <h3 id="modal-title" class="text-lg font-semibold text-gray-800 truncate pr-4"></h3>
+    <div class="bg-card rounded-xl shadow-lg w-full max-w-3xl max-h-[80vh] flex flex-col card-border">
+      <div class="flex items-center justify-between p-4 card-border border-b">
+        <h3 id="modal-title" class="text-lg font-semibold truncate pr-4" style="color: var(--text);"></h3>
         <button id="closePreview" class="text-gray-400 hover:text-gray-600 focus:outline-none">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
       </div>
-      <div id="modal-content" class="p-6 overflow-y-auto flex-1 bg-gray-50 rounded-b-xl"></div>
+      <div id="modal-content" class="p-6 overflow-y-auto flex-1 rounded-b-xl" style="background: rgba(148,163,184,0.08);"></div>
     </div>
   </div>
 
   <div id="auth-modal" class="fixed inset-0 z-50 hidden bg-gray-900 bg-opacity-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-lg w-full max-w-md">
-      <div class="p-4 border-b border-gray-100 flex items-center justify-between">
-        <div class="text-lg font-semibold text-gray-800">登录 / 注册</div>
+    <div class="bg-card rounded-xl shadow-lg w-full max-w-md card-border">
+      <div class="p-4 flex items-center justify-between card-border border-b">
+        <div class="text-lg font-semibold" style="color: var(--text);">登录 / 注册</div>
         <button id="closeAuth" class="text-gray-400 hover:text-gray-600 focus:outline-none">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
       </div>
       <div class="p-4">
         <div class="flex gap-2 mb-4">
-          <button id="tabLogin" class="flex-1 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm">登录</button>
-          <button id="tabRegister" class="flex-1 px-3 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm">注册</button>
+          <button id="tabLogin" class="flex-1 px-3 py-2 rounded-lg text-sm btn-primary">登录</button>
+          <button id="tabRegister" class="flex-1 px-3 py-2 rounded-lg text-sm btn-soft">注册</button>
         </div>
 
         <div id="login-panel">
           <div class="space-y-3">
-            <input id="loginUsername" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="用户名">
-            <input id="loginPassword" type="password" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="密码">
-            <button id="loginBtn" class="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">登录</button>
+            <input id="loginUsername" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="用户名">
+            <input id="loginPassword" type="password" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="密码">
+            <button id="loginBtn" class="w-full px-4 py-2 rounded-lg text-sm btn-primary">登录</button>
           </div>
         </div>
 
         <div id="register-panel" class="hidden">
           <div class="space-y-3">
-            <input id="inviteCode" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="邀请码">
-            <input id="registerUsername" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="用户名">
-            <input id="registerPassword" type="password" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="密码">
-            <button id="registerBtn" class="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">注册</button>
+            <input id="inviteCode" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="邀请码">
+            <input id="registerUsername" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="用户名">
+            <input id="registerPassword" type="password" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="密码">
+            <button id="registerBtn" class="w-full px-4 py-2 rounded-lg text-sm btn-primary">注册</button>
           </div>
         </div>
 
@@ -378,42 +427,42 @@
   </div>
 
   <div id="profile-modal" class="fixed inset-0 z-50 hidden bg-gray-900 bg-opacity-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-lg w-full max-w-md">
-      <div class="p-4 border-b border-gray-100 flex items-center justify-between">
-        <div class="text-lg font-semibold text-gray-800">个人资料</div>
+    <div class="bg-card rounded-xl shadow-lg w-full max-w-md card-border">
+      <div class="p-4 flex items-center justify-between card-border border-b">
+        <div class="text-lg font-semibold" style="color: var(--text);">个人资料</div>
         <button id="closeProfile" class="text-gray-400 hover:text-gray-600 focus:outline-none">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
       </div>
       <div class="p-4 space-y-4">
         <div>
-          <div class="text-sm font-medium text-gray-700 mb-1">昵称</div>
+          <div class="text-sm font-medium mb-1" style="color: var(--text);">昵称</div>
           <div class="flex gap-2">
-            <input id="nicknameInput" class="flex-1 px-3 py-2 border rounded-lg text-sm" placeholder="请输入昵称（1-20字）">
-            <button id="saveNicknameBtn" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">保存</button>
+            <input id="nicknameInput" class="flex-1 px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="请输入昵称（1-20字）">
+            <button id="saveNicknameBtn" class="px-4 py-2 rounded-lg text-sm btn-primary">保存</button>
           </div>
         </div>
         <div>
-          <div class="text-sm font-medium text-gray-700 mb-1">头像</div>
+          <div class="text-sm font-medium mb-1" style="color: var(--text);">头像</div>
           <div class="flex items-center gap-3">
-            <img id="profileAvatarPreview" class="w-12 h-12 rounded-full object-cover border border-gray-200" alt="avatar">
+            <img id="profileAvatarPreview" class="w-12 h-12 rounded-full object-cover" style="border: 1px solid var(--border);" alt="avatar">
             <div class="flex-1">
               <input id="avatarFile" type="file" accept="image/png,image/jpeg,image/webp" class="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200">
-              <div class="text-xs text-gray-500 mt-1">支持 png/jpg/webp，最大 2MB</div>
+              <div class="text-xs muted mt-1">支持 png/jpg/webp，最大 2MB</div>
             </div>
           </div>
           <div class="mt-2 flex justify-end">
-            <button id="uploadAvatarBtn" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">上传头像</button>
+            <button id="uploadAvatarBtn" class="px-4 py-2 rounded-lg text-sm btn-primary">上传头像</button>
           </div>
         </div>
         <div>
-          <div class="text-sm font-medium text-gray-700 mb-1">修改密码</div>
+          <div class="text-sm font-medium mb-1" style="color: var(--text);">修改密码</div>
           <div class="space-y-2">
-            <input id="oldPasswordInput" type="password" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="旧密码">
-            <input id="newPasswordInput" type="password" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="新密码（至少6位）">
-            <input id="newPassword2Input" type="password" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="确认新密码">
+            <input id="oldPasswordInput" type="password" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="旧密码">
+            <input id="newPasswordInput" type="password" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="新密码（至少6位）">
+            <input id="newPassword2Input" type="password" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="确认新密码">
             <div class="flex justify-end">
-              <button id="changePasswordBtn" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">保存密码</button>
+              <button id="changePasswordBtn" class="px-4 py-2 rounded-lg text-sm btn-primary">保存密码</button>
             </div>
           </div>
         </div>
@@ -483,6 +532,7 @@
     const userBar = document.getElementById('user-bar')
     const avatarImg = document.getElementById('avatarImg')
     const currentUserEl = document.getElementById('current-user')
+    const themeToggleBtn = document.getElementById('themeToggleBtn')
     const settingsBtn = document.getElementById('settingsBtn')
     const logoutBtn = document.getElementById('logoutBtn')
     const profileModal = document.getElementById('profile-modal')
@@ -552,11 +602,33 @@
     const API_BASE = 'https://hmingbo-zhongkao-kb-api.hf.space'
     const QUOTE_CACHE_KEY = 'ZKKB_DAILY_QUOTE'
     const TOKEN_KEY = 'ZKKB_TOKEN'
+    const THEME_KEY = 'ZKKB_THEME'
     let filterActive = false
 
     function getToken() { return localStorage.getItem(TOKEN_KEY) || '' }
     function setToken(t) { localStorage.setItem(TOKEN_KEY, t) }
     function clearToken() { localStorage.removeItem(TOKEN_KEY); favorites.clear() }
+
+    function getThemePreference() {
+      try { return localStorage.getItem(THEME_KEY) || '' } catch (e) { return '' }
+    }
+
+    function setThemePreference(v) {
+      try {
+        if (!v) localStorage.removeItem(THEME_KEY)
+        else localStorage.setItem(THEME_KEY, v)
+      } catch (e) {}
+    }
+
+    function systemPrefersDark() {
+      try { return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches } catch (e) { return false }
+    }
+
+    function applyTheme(v) {
+      const theme = v === 'dark' ? 'dark' : (v === 'light' ? 'light' : (systemPrefersDark() ? 'dark' : 'light'))
+      document.documentElement.dataset.theme = theme
+      if (themeToggleBtn) themeToggleBtn.textContent = theme === 'dark' ? '浅色' : '深色'
+    }
 
     let avatarObjectUrl = ''
     const selectedKb = new Set()
@@ -636,8 +708,10 @@
       document.querySelectorAll('[data-tab]').forEach(btn => {
         const active = (btn.getAttribute('data-tab') || '') === name
         btn.className = active
-          ? 'px-4 py-2 -mb-px text-sm font-medium border-b-2 border-blue-600 text-blue-700'
-          : 'px-4 py-2 -mb-px text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+          ? 'px-4 py-2 -mb-px text-sm font-medium'
+          : 'px-4 py-2 -mb-px text-sm font-medium'
+        btn.style.borderBottom = active ? '2px solid var(--primary)' : '2px solid transparent'
+        btn.style.color = active ? 'var(--primary)' : 'var(--muted)'
       })
       document.querySelectorAll('[data-page]').forEach(sec => {
         sec.classList.toggle('hidden', (sec.getAttribute('data-page') || '') !== name)
@@ -823,7 +897,7 @@
       el.innerHTML = `
         <details class="inline-block text-left">
           <summary class="cursor-pointer select-none">${escapeHtml(line)}</summary>
-          <div class="mt-1 text-gray-600">${escapeHtml(data.summary)}</div>
+          <div class="mt-1 text-muted">${escapeHtml(data.summary)}</div>
         </details>
       `
     }
@@ -2092,6 +2166,15 @@
       showAuthModal()
     })
 
+    if (themeToggleBtn) {
+      themeToggleBtn.addEventListener('click', () => {
+        const current = document.documentElement.dataset.theme || 'light'
+        const next = current === 'dark' ? 'light' : 'dark'
+        setThemePreference(next)
+        applyTheme(next)
+      })
+    }
+
     settingsBtn.addEventListener('click', async () => {
       location.hash = '#/trash'
       await loadTrash()
@@ -2203,6 +2286,14 @@
     })
 
     loadDailyQuote()
+    applyTheme(getThemePreference())
+    try {
+      if (window.matchMedia) {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+          if (!getThemePreference()) applyTheme('')
+        })
+      }
+    } catch (e) {}
 
     document.querySelectorAll('[data-tab]').forEach(btn => {
       btn.addEventListener('click', () => {
