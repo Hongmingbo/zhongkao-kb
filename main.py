@@ -620,41 +620,48 @@ def process_single_file(file_path: Path, original_filename: str, kb_dir: Path) -
     category_dir = kb_dir / category
     category_dir.mkdir(exist_ok=True)
     
-    # 4. 格式转换与切块
+    # 4. 保存策略
     ext = Path(original_filename).suffix.lower()
+    text_like = ext in [".txt", ".md", ".csv"]
+    image_like = ext in [".jpg", ".jpeg", ".png"]
+    pdf_doc_like = ext in [".pdf", ".doc", ".docx"]
+
     final_filename = original_filename
     final_path = category_dir / final_filename
-    
-    if ext in ['.pdf', '.docx', '.doc', '.jpg', '.jpeg', '.png']:
-        # 转换为 Markdown
-        final_filename = Path(original_filename).stem + ".md"
-        final_path = category_dir / final_filename
-        
-        # 避免同名覆盖
-        counter = 1
-        while final_path.exists():
-            final_filename = f"{Path(original_filename).stem}_{counter}.md"
-            final_path = category_dir / final_filename
-            counter += 1
-            
+
+    if text_like:
         chunked_text = chunk_text(text_content)
-        if not chunked_text.strip():
-            chunked_text = placeholder_for(ext)
-        final_path.write_text(chunked_text, encoding='utf-8')
+        final_path.write_text(chunked_text, encoding="utf-8")
+    elif image_like:
+        shutil.copy2(file_path, final_path)
+    elif pdf_doc_like:
+        shutil.copy2(file_path, final_path)
+
+        derived_filename = original_filename + ".md"
+        derived_path = category_dir / derived_filename
+        counter = 1
+        while derived_path.exists():
+            derived_filename = f"{original_filename}.{counter}.md"
+            derived_path = category_dir / derived_filename
+            counter += 1
+
+        derived_text = chunk_text(text_content)
+        if not derived_text.strip():
+            derived_text = placeholder_for(ext)
+        derived_path.write_text(derived_text, encoding="utf-8")
     else:
-        # 普通文本文件直接复制，但也可以进行切块处理
-        if ext in ['.txt', '.md']:
-            chunked_text = chunk_text(text_content)
-            final_path.write_text(chunked_text, encoding='utf-8')
-        else:
-            shutil.copy2(file_path, final_path)
+        shutil.copy2(file_path, final_path)
             
     # 5. 提取并保存元数据
     meta = extract_metadata(original_filename, text_content, file_md5)
     if meta:
         meta_path = category_dir / f"{final_path.name}.meta.json"
-        with open(meta_path, 'w', encoding='utf-8') as f:
+        with open(meta_path, "w", encoding="utf-8") as f:
             json.dump(meta, f, ensure_ascii=False, indent=2)
+        if pdf_doc_like:
+            derived_meta_path = category_dir / f"{derived_path.name}.meta.json"
+            with open(derived_meta_path, "w", encoding="utf-8") as f:
+                json.dump(meta, f, ensure_ascii=False, indent=2)
             
     return {
         "status": "success",

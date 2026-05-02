@@ -3,5 +3,6 @@ __pycache__/
 *.db
 *.sqlite
 *.sqlite3
+.superpowers/
 knowledge_base/**
 !knowledge_base/.gitkeep
