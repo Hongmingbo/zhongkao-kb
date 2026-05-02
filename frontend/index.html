@@ -170,21 +170,57 @@
           <svg class="w-5 h-5 mr-2 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14"></path></svg>
           回收站与设置
         </h2>
-        <div class="flex flex-wrap gap-4">
-          <button id="trashBtn2" class="text-sm text-gray-700 hover:text-gray-900 flex items-center">
-            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14"></path></svg>
-            打开回收站
-          </button>
-          <button id="refreshBtn" class="text-sm text-blue-500 hover:text-blue-700 flex items-center">
-            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-            刷新目录
-          </button>
-          <button id="clearBtn" class="text-sm text-red-500 hover:text-red-700 flex items-center">
-            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-            清空知识库
-          </button>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <section class="rounded-xl border border-gray-100 bg-white p-4">
+            <div class="flex items-center justify-between gap-2">
+              <div class="text-sm font-semibold text-gray-800" id="trash-count-page">回收站</div>
+              <div class="flex flex-wrap gap-2">
+                <button id="trashRestoreSelectedBtnPage" class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">恢复已选</button>
+                <button id="trashPurgeSelectedBtnPage" class="px-3 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm hover:bg-gray-200">删除已选</button>
+                <button id="trashClearSelectedBtnPage" class="px-3 py-2 rounded-lg bg-white text-gray-800 text-sm border border-gray-200 hover:bg-gray-50">取消选择</button>
+                <button id="clearTrashBtnPage" class="px-3 py-2 rounded-lg bg-red-600 text-white text-sm hover:bg-red-700">清空回收站</button>
+              </div>
+            </div>
+            <div id="trash-list-page" class="mt-4 max-h-[520px] overflow-y-auto"></div>
+          </section>
+
+          <section class="rounded-xl border border-gray-100 bg-white p-4" id="settings-panel">
+            <div class="text-sm font-semibold text-gray-800 mb-3">账号设置</div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <div class="text-sm font-medium text-gray-700 mb-1">昵称</div>
+                <div class="flex gap-2">
+                  <input id="nicknameInputPage" class="flex-1 px-3 py-2 border rounded-lg text-sm" placeholder="昵称（1-20）">
+                  <button id="saveNicknameBtnPage" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">保存</button>
+                </div>
+              </div>
+              <div>
+                <div class="text-sm font-medium text-gray-700 mb-1">头像</div>
+                <div class="flex items-center gap-3">
+                  <img id="profileAvatarPreviewPage" class="w-12 h-12 rounded-full object-cover border border-gray-200" alt="avatar">
+                  <div class="flex-1">
+                    <input id="avatarFilePage" type="file" accept="image/*" class="block w-full text-sm text-gray-700">
+                    <div class="mt-2">
+                      <button id="uploadAvatarBtnPage" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">上传头像</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="sm:col-span-2">
+                <div class="text-sm font-medium text-gray-700 mb-1">修改密码</div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <input id="oldPasswordInputPage" type="password" class="px-3 py-2 border rounded-lg text-sm" placeholder="旧密码">
+                  <input id="newPasswordInputPage" type="password" class="px-3 py-2 border rounded-lg text-sm" placeholder="新密码（至少6位）">
+                  <input id="newPassword2InputPage" type="password" class="px-3 py-2 border rounded-lg text-sm" placeholder="确认新密码">
+                </div>
+                <div class="mt-2 flex justify-end">
+                  <button id="changePasswordBtnPage" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">保存密码</button>
+                </div>
+              </div>
+            </div>
+            <div id="profile-msg-page" class="text-sm mt-3"></div>
+          </section>
         </div>
-        <div class="text-sm text-gray-500 mt-3">账号相关（头像/昵称/密码）在右上角“设置”里。</div>
       </section>
     </main>
   </div>
@@ -441,6 +477,16 @@
     const uploadAvatarBtn = document.getElementById('uploadAvatarBtn')
     const profileAvatarPreview = document.getElementById('profileAvatarPreview')
     const profileMsg = document.getElementById('profile-msg')
+    const nicknameInputPage = document.getElementById('nicknameInputPage')
+    const saveNicknameBtnPage = document.getElementById('saveNicknameBtnPage')
+    const avatarFilePage = document.getElementById('avatarFilePage')
+    const uploadAvatarBtnPage = document.getElementById('uploadAvatarBtnPage')
+    const profileAvatarPreviewPage = document.getElementById('profileAvatarPreviewPage')
+    const profileMsgPage = document.getElementById('profile-msg-page')
+    const oldPasswordInputPage = document.getElementById('oldPasswordInputPage')
+    const newPasswordInputPage = document.getElementById('newPasswordInputPage')
+    const newPassword2InputPage = document.getElementById('newPassword2InputPage')
+    const changePasswordBtnPage = document.getElementById('changePasswordBtnPage')
     const trashModal = document.getElementById('trash-modal')
     const closeTrashBtn = document.getElementById('closeTrash')
     const trashList = document.getElementById('trash-list')
@@ -449,6 +495,12 @@
     const trashRestoreSelectedBtn = document.getElementById('trashRestoreSelectedBtn')
     const trashPurgeSelectedBtn = document.getElementById('trashPurgeSelectedBtn')
     const trashClearSelectedBtn = document.getElementById('trashClearSelectedBtn')
+    const trashListPage = document.getElementById('trash-list-page')
+    const trashCountPage = document.getElementById('trash-count-page')
+    const clearTrashBtnPage = document.getElementById('clearTrashBtnPage')
+    const trashRestoreSelectedBtnPage = document.getElementById('trashRestoreSelectedBtnPage')
+    const trashPurgeSelectedBtnPage = document.getElementById('trashPurgeSelectedBtnPage')
+    const trashClearSelectedBtnPage = document.getElementById('trashClearSelectedBtnPage')
     const metaModal = document.getElementById('meta-modal')
     const closeMetaBtn = document.getElementById('closeMeta')
     const metaYearInput = document.getElementById('metaYearInput')
@@ -595,6 +647,10 @@
     function setProfileMsg(text, ok) {
       profileMsg.className = ok ? 'text-sm text-green-700' : 'text-sm text-red-700'
       profileMsg.textContent = text
+      if (profileMsgPage) {
+        profileMsgPage.className = ok ? 'text-sm text-green-700 mt-3' : 'text-sm text-red-700 mt-3'
+        profileMsgPage.textContent = text
+      }
     }
 
     function showProfileModal() {
@@ -602,6 +658,8 @@
       setProfileMsg('', true)
       nicknameInput.value = currentUserEl.textContent || ''
       profileAvatarPreview.src = avatarImg.src || ''
+      if (nicknameInputPage) nicknameInputPage.value = nicknameInput.value || ''
+      if (profileAvatarPreviewPage) profileAvatarPreviewPage.src = profileAvatarPreview.src || ''
     }
 
     function hideProfileModal() {
@@ -894,11 +952,13 @@
         const data = await r.json().catch(() => ({}))
         const items = Array.isArray(data.items) ? data.items : []
         trashCount.textContent = `共 ${items.length} 个条目（已选 ${selectedTrash.size}）`
+        if (trashCountPage) trashCountPage.textContent = `回收站（共 ${items.length} 个，已选 ${selectedTrash.size}）`
         if (!items.length) {
           trashList.innerHTML = '<p class="text-sm text-gray-500 text-center py-10">回收站为空</p>'
+          if (trashListPage) trashListPage.innerHTML = '<p class="text-sm text-gray-500 text-center py-10">回收站为空</p>'
           return
         }
-        trashList.innerHTML = `
+        const html = `
           <div class="space-y-2">
             ${items.map(it => `
               <div class="p-3 rounded-lg border border-gray-200 bg-white flex items-center justify-between gap-3">
@@ -906,7 +966,7 @@
                   <input type="checkbox" class="mt-1 h-4 w-4" data-trash-select="1" data-id="${escapeAttr(it.id || '')}" ${selectedTrash.has(it.id) ? 'checked' : ''}>
                   <div class="min-w-0">
                     <div class="text-sm font-medium text-gray-800 truncate" title="${escapeHtml(it.filename || '')}">${escapeHtml(it.filename || '')}</div>
-                  <div class="text-xs text-gray-500 mt-1">原位置：${escapeHtml(it.category || '')} · 删除时间：${escapeHtml(formatTime(it.deleted_at))}</div>
+                    <div class="text-xs text-gray-500 mt-1">原位置：${escapeHtml(it.category || '')} · 删除时间：${escapeHtml(formatTime(it.deleted_at))}</div>
                   </div>
                 </div>
                 <div class="flex gap-2 shrink-0">
@@ -917,9 +977,13 @@
             `).join('')}
           </div>
         `
+        trashList.innerHTML = html
+        if (trashListPage) trashListPage.innerHTML = html
       } catch (e) {
         trashCount.textContent = '加载失败'
         trashList.innerHTML = '<p class="text-sm text-red-600 text-center py-10">回收站加载失败</p>'
+        if (trashCountPage) trashCountPage.textContent = '回收站（加载失败）'
+        if (trashListPage) trashListPage.innerHTML = '<p class="text-sm text-red-600 text-center py-10">回收站加载失败</p>'
       }
     }
 
@@ -1258,6 +1322,27 @@
       else selectedTrash.delete(id)
       void loadTrash()
     })
+
+    if (trashListPage) {
+      trashListPage.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button')
+        if (!btn) return
+        const action = btn.getAttribute('data-action')
+        const id = btn.getAttribute('data-id')
+        if (!action || !id) return
+        if (action === 'trash-restore') await restoreTrash(id)
+        if (action === 'trash-delete') await deleteTrash(id)
+      })
+      trashListPage.addEventListener('change', (e) => {
+        const el = e.target
+        if (!el || el.getAttribute('data-trash-select') !== '1') return
+        const id = el.getAttribute('data-id') || ''
+        if (!id) return
+        if (el.checked) selectedTrash.add(id)
+        else selectedTrash.delete(id)
+        void loadTrash()
+      })
+    }
 
     function bindSearchResults(el) {
       if (!el) return
@@ -1599,10 +1684,11 @@
       })
     }
     refreshBtn.addEventListener('click', () => { if (filterActive) applyFilters(); else loadStats() })
-    trashBtn.addEventListener('click', async () => { showTrashModal(); await loadTrash() })
+    trashBtn.addEventListener('click', async () => { location.hash = '#/trash'; await loadTrash() })
     closeTrashBtn.addEventListener('click', hideTrashModal)
     trashModal.addEventListener('click', (e) => { if (e.target === trashModal) hideTrashModal() })
     clearTrashBtn.addEventListener('click', clearTrashAll)
+    if (clearTrashBtnPage) clearTrashBtnPage.addEventListener('click', clearTrashAll)
     bulkCancelBtn.addEventListener('click', () => { selectedKb.clear(); updateBulkBar(); void loadStats() })
     bulkTrashBtn.addEventListener('click', async () => {
       if (!selectedKb.size) return
@@ -1674,8 +1760,9 @@
       if (!selectedKb.size) return
       showBatchRenameModal()
     })
-    if (trashBtn2) trashBtn2.addEventListener('click', async () => { showTrashModal(); await loadTrash() })
+    if (trashBtn2) trashBtn2.addEventListener('click', async () => { location.hash = '#/trash'; await loadTrash() })
     trashClearSelectedBtn.addEventListener('click', () => { selectedTrash.clear(); void loadTrash() })
+    if (trashClearSelectedBtnPage) trashClearSelectedBtnPage.addEventListener('click', () => { selectedTrash.clear(); void loadTrash() })
     trashRestoreSelectedBtn.addEventListener('click', async () => {
       if (!selectedTrash.size) return
       const ids = Array.from(selectedTrash)
@@ -1702,6 +1789,28 @@
         alert('批量恢复失败')
       }
     })
+    if (trashRestoreSelectedBtnPage) trashRestoreSelectedBtnPage.addEventListener('click', async () => { await (async () => {
+      if (!selectedTrash.size) return
+      const items = Array.from(selectedTrash).slice(0, 500).map(id => ({ id }))
+      try {
+        const r = await apiFetch('/api/trash/batch_restore', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items }),
+        })
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok || data.status !== 'success') {
+          alert((data && data.detail) || '批量操作失败')
+          return
+        }
+        selectedTrash.clear()
+        await loadTrash()
+        if (filterActive) await applyFilters()
+        else await loadStats()
+      } catch (e) {
+        alert('批量操作失败')
+      }
+    })() })
     trashPurgeSelectedBtn.addEventListener('click', async () => {
       if (!selectedTrash.size) return
       if (!confirm('确定彻底删除已选文件吗？此操作不可恢复。')) return
@@ -1727,6 +1836,27 @@
         alert('批量删除失败')
       }
     })
+    if (trashPurgeSelectedBtnPage) trashPurgeSelectedBtnPage.addEventListener('click', async () => { await (async () => {
+      if (!selectedTrash.size) return
+      if (!confirm(`确定彻底删除已选择的 ${selectedTrash.size} 个文件吗？此操作不可恢复。`)) return
+      const items = Array.from(selectedTrash).slice(0, 500).map(id => ({ id }))
+      try {
+        const r = await apiFetch('/api/trash/batch_purge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items }),
+        })
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok || data.status !== 'success') {
+          alert((data && data.detail) || '批量操作失败')
+          return
+        }
+        selectedTrash.clear()
+        await loadTrash()
+      } catch (e) {
+        alert('批量操作失败')
+      }
+    })() })
     closeMetaBtn.addEventListener('click', hideMetaModal)
     metaModal.addEventListener('click', (e) => { if (e.target === metaModal) hideMetaModal() })
     metaApplyBtn.addEventListener('click', async () => {
@@ -1860,8 +1990,8 @@
     closeProfileBtn.addEventListener('click', hideProfileModal)
     profileModal.addEventListener('click', (e) => { if (e.target === profileModal) hideProfileModal() })
 
-    saveNicknameBtn.addEventListener('click', async () => {
-      const nickname = (nicknameInput.value || '').trim()
+    async function saveNicknameFromInput(inputEl) {
+      const nickname = ((inputEl && inputEl.value) || '').trim()
       try {
         const r = await apiFetch('/api/profile/nickname', {
           method: 'POST',
@@ -1880,10 +2010,12 @@
       } catch (e) {
         setProfileMsg('保存失败', false)
       }
-    })
+    }
+    saveNicknameBtn.addEventListener('click', async () => { await saveNicknameFromInput(nicknameInput) })
+    if (saveNicknameBtnPage) saveNicknameBtnPage.addEventListener('click', async () => { await saveNicknameFromInput(nicknameInputPage) })
 
-    uploadAvatarBtn.addEventListener('click', async () => {
-      const f = avatarFile.files && avatarFile.files[0]
+    async function uploadAvatarFromInput(fileInputEl) {
+      const f = fileInputEl && fileInputEl.files && fileInputEl.files[0]
       if (!f) { setProfileMsg('请先选择头像文件。', false); return }
       const fd = new FormData()
       fd.append('file', f)
@@ -1896,16 +2028,19 @@
         }
         await loadAvatar()
         profileAvatarPreview.src = avatarImg.src || ''
+        if (profileAvatarPreviewPage) profileAvatarPreviewPage.src = avatarImg.src || ''
         setProfileMsg('头像已更新。', true)
       } catch (e) {
         setProfileMsg('上传失败', false)
       }
-    })
+    }
+    uploadAvatarBtn.addEventListener('click', async () => { await uploadAvatarFromInput(avatarFile) })
+    if (uploadAvatarBtnPage) uploadAvatarBtnPage.addEventListener('click', async () => { await uploadAvatarFromInput(avatarFilePage) })
 
-    changePasswordBtn.addEventListener('click', async () => {
-      const old_password = oldPasswordInput.value || ''
-      const new_password = newPasswordInput.value || ''
-      const new2 = newPassword2Input.value || ''
+    async function changePasswordFromInputs(oldEl, newEl, new2El) {
+      const old_password = (oldEl && oldEl.value) || ''
+      const new_password = (newEl && newEl.value) || ''
+      const new2 = (new2El && new2El.value) || ''
       if (!old_password || !new_password) { setProfileMsg('请输入旧密码与新密码。', false); return }
       if (new_password.length < 6) { setProfileMsg('新密码至少 6 位。', false); return }
       if (new_password !== new2) { setProfileMsg('两次输入的新密码不一致。', false); return }
@@ -1931,7 +2066,9 @@
       } catch (e) {
         setProfileMsg('修改失败', false)
       }
-    })
+    }
+    changePasswordBtn.addEventListener('click', async () => { await changePasswordFromInputs(oldPasswordInput, newPasswordInput, newPassword2Input) })
+    if (changePasswordBtnPage) changePasswordBtnPage.addEventListener('click', async () => { await changePasswordFromInputs(oldPasswordInputPage, newPasswordInputPage, newPassword2InputPage) })
     clearBtn.addEventListener('click', async () => {
       const base = getApiBase()
       if (!base) return
@@ -1987,6 +2124,8 @@
         if (r.ok && data && data.username) {
           renderUserBar(data)
           await loadAvatar()
+          if (nicknameInputPage) nicknameInputPage.value = data.nickname ? data.nickname : data.username
+          if (profileAvatarPreviewPage) profileAvatarPreviewPage.src = avatarImg.src || ''
           await loadStats()
           return
         }
