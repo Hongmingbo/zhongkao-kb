@@ -63,60 +63,73 @@
           <svg class="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
           知识库结构
         </h2>
-        <div class="rounded-lg border border-gray-100 bg-white p-3 mb-4">
-          <div class="text-sm font-medium text-gray-700 mb-2">筛选面板</div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <select id="filterCategory" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="">全部学科</option>
-            </select>
-            <select id="filterYear" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="">全部年份</option>
-            </select>
-            <select id="filterRegion" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="">全部地区</option>
-            </select>
-            <select id="filterType" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="">全部类型</option>
-            </select>
-            <select id="filterExt" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="">全部后缀</option>
-            </select>
-            <div class="flex gap-2">
-              <button id="applyFiltersBtn" class="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">应用筛选</button>
-              <button id="clearFiltersBtn" class="flex-1 px-4 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm hover:bg-gray-200">清除筛选</button>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2">
+            <div class="rounded-lg border border-gray-100 bg-white p-3 mb-4">
+              <div class="text-sm font-medium text-gray-700 mb-2">筛选面板</div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <select id="filterCategory" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">全部学科</option>
+                </select>
+                <select id="filterYear" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">全部年份</option>
+                </select>
+                <select id="filterRegion" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">全部地区</option>
+                </select>
+                <select id="filterType" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">全部类型</option>
+                </select>
+                <select id="filterExt" class="px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">全部后缀</option>
+                </select>
+                <div class="flex gap-2">
+                  <button id="applyFiltersBtn" class="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">应用筛选</button>
+                  <button id="clearFiltersBtn" class="flex-1 px-4 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm hover:bg-gray-200">清除筛选</button>
+                </div>
+              </div>
+            </div>
+            <div id="search-results" class="hidden mb-4"></div>
+            <div id="kb-stats" class="space-y-4 max-h-[520px] overflow-y-auto">
+              <p class="text-gray-500 text-sm">加载中...</p>
+            </div>
+            <div id="bulk-bar" class="hidden mt-4 p-3 rounded-lg border border-blue-100 bg-blue-50 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2">
+              <div class="text-sm text-blue-900"><span id="bulk-count">已选择 0 个</span></div>
+              <div class="flex flex-wrap gap-2">
+                <select id="bulkTargetCategory" class="px-3 py-2 rounded-lg bg-white text-gray-800 text-sm border border-gray-200">
+                  <option value="">选择目标学科</option>
+                </select>
+                <button id="bulkCancelBtn" class="px-3 py-2 rounded-lg bg-white text-gray-800 text-sm border border-gray-200 hover:bg-gray-50">取消选择</button>
+                <button id="bulkTrashBtn" class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">批量移入回收站</button>
+                <button id="bulkMoveBtn" class="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700">批量移动</button>
+                <button id="bulkMetaBtn" class="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700">批量改标签</button>
+                <button id="bulkBatchRenameBtn" class="px-3 py-2 rounded-lg bg-gray-800 text-white text-sm hover:bg-gray-900">批量重命名</button>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-4 mt-4">
+              <button id="refreshBtn" class="text-sm text-blue-500 hover:text-blue-700 flex items-center">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                刷新目录
+              </button>
+              <button id="trashBtn" class="text-sm text-gray-700 hover:text-gray-900 flex items-center">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14"></path></svg>
+                回收站
+              </button>
+              <button id="clearBtn" class="text-sm text-red-500 hover:text-red-700 flex items-center">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                清空知识库
+              </button>
             </div>
           </div>
-        </div>
-        <div id="search-results" class="hidden mb-4"></div>
-        <div id="kb-stats" class="space-y-4 max-h-[420px] overflow-y-auto">
-          <p class="text-gray-500 text-sm">加载中...</p>
-        </div>
-        <div id="bulk-bar" class="hidden mt-4 p-3 rounded-lg border border-blue-100 bg-blue-50 flex items-center justify-between gap-2">
-          <div class="text-sm text-blue-900"><span id="bulk-count">已选择 0 个</span></div>
-          <div class="flex gap-2">
-            <select id="bulkTargetCategory" class="px-3 py-2 rounded-lg bg-white text-gray-800 text-sm border border-gray-200">
-              <option value="">选择目标学科</option>
-            </select>
-            <button id="bulkCancelBtn" class="px-3 py-2 rounded-lg bg-white text-gray-800 text-sm border border-gray-200 hover:bg-gray-50">取消选择</button>
-            <button id="bulkTrashBtn" class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700">批量移入回收站</button>
-            <button id="bulkMoveBtn" class="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700">批量移动</button>
-            <button id="bulkMetaBtn" class="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700">批量改标签</button>
-            <button id="bulkBatchRenameBtn" class="px-3 py-2 rounded-lg bg-gray-800 text-white text-sm hover:bg-gray-900">批量重命名</button>
-          </div>
-        </div>
-        <div class="flex gap-4 mt-4">
-          <button id="refreshBtn" class="text-sm text-blue-500 hover:text-blue-700 flex items-center">
-            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-            刷新目录
-          </button>
-          <button id="trashBtn" class="text-sm text-gray-700 hover:text-gray-900 flex items-center">
-            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14"></path></svg>
-            回收站
-          </button>
-          <button id="clearBtn" class="text-sm text-red-500 hover:text-red-700 flex items-center">
-            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-            清空知识库
-          </button>
+          <aside id="library-preview" class="hidden lg:block lg:col-span-1">
+            <div class="sticky top-4 rounded-xl border border-gray-100 bg-gray-50 p-4">
+              <div class="flex items-center justify-between gap-2">
+                <div class="text-sm font-semibold text-gray-800" id="library-preview-title">预览</div>
+                <button id="libraryPreviewClearBtn" class="text-xs text-gray-600 hover:text-gray-900">清空</button>
+              </div>
+              <div class="mt-3 text-sm text-gray-500" id="library-preview-body">选择一个文件进行预览（桌面端）。</div>
+            </div>
+          </aside>
         </div>
       </section>
 
@@ -353,6 +366,9 @@
     const statusDiv = uploadStatus.querySelector('div')
     const uploadQueueEl = document.getElementById('upload-queue')
     const kbStats = document.getElementById('kb-stats')
+    const libraryPreviewTitle = document.getElementById('library-preview-title')
+    const libraryPreviewBody = document.getElementById('library-preview-body')
+    const libraryPreviewClearBtn = document.getElementById('libraryPreviewClearBtn')
     const refreshBtn = document.getElementById('refreshBtn')
     const trashBtn = document.getElementById('trashBtn')
     const trashBtn2 = document.getElementById('trashBtn2')
@@ -1241,6 +1257,10 @@
     bindSearchResults(searchResults)
     bindSearchResults(searchResults2)
 
+    function isDesktopPreview() {
+      try { return window.matchMedia && window.matchMedia('(min-width: 1024px)').matches } catch (e) { return false }
+    }
+
     function renderPreviewTo(el, base, category, filename, data) {
       if (!el) return
       if (data.type === 'text') {
@@ -1298,6 +1318,11 @@
         const data = await response.json()
         if (!response.ok) {
           alert('预览失败: ' + (data && data.detail ? data.detail : String(response.status)))
+          return
+        }
+        if (isDesktopPreview() && libraryPreviewBody && parseTabFromHash() === 'library') {
+          if (libraryPreviewTitle) libraryPreviewTitle.textContent = data.filename || filename
+          renderPreviewTo(libraryPreviewBody, base, category, filename, data)
           return
         }
         modalTitle.textContent = data.filename || filename
@@ -1513,6 +1538,23 @@
       if (!category || !filename) return
       await previewFile(category, filename)
     })
+    if (libraryPreviewBody) {
+      libraryPreviewBody.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button')
+        if (!btn) return
+        if (btn.getAttribute('data-action') !== 'preview-derived') return
+        const category = btn.getAttribute('data-category') || ''
+        const filename = btn.getAttribute('data-filename') || ''
+        if (!category || !filename) return
+        await previewFile(category, filename)
+      })
+    }
+    if (libraryPreviewClearBtn) {
+      libraryPreviewClearBtn.addEventListener('click', () => {
+        if (libraryPreviewTitle) libraryPreviewTitle.textContent = '预览'
+        if (libraryPreviewBody) libraryPreviewBody.textContent = '选择一个文件进行预览（桌面端）。'
+      })
+    }
     refreshBtn.addEventListener('click', () => { if (filterActive) applyFilters(); else loadStats() })
     trashBtn.addEventListener('click', async () => { showTrashModal(); await loadTrash() })
     closeTrashBtn.addEventListener('click', hideTrashModal)
