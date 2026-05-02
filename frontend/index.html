@@ -74,6 +74,13 @@
     .brand-title { background: linear-gradient(90deg, var(--primary), var(--accent)); -webkit-background-clip: text; background-clip: text; color: transparent; }
     .brand-bar { height: 2px; width: 11.5rem; border-radius: 999px; background: linear-gradient(90deg, rgba(37,99,235,0.60), rgba(6,182,212,0.60)); }
     html[data-theme="dark"] .brand-bar { background: linear-gradient(90deg, rgba(96,165,250,0.45), rgba(34,211,238,0.45)); }
+    .accent-card { position: relative; overflow: hidden; }
+    .accent-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, rgba(37,99,235,0.70), rgba(6,182,212,0.70)); }
+    html[data-theme="dark"] .accent-card::before { background: linear-gradient(90deg, rgba(96,165,250,0.55), rgba(34,211,238,0.55)); }
+    .empty-state { text-align: center; padding: 2.5rem 1rem; }
+    .empty-icon { width: 44px; height: 44px; margin: 0 auto; color: var(--accent); }
+    .empty-title { margin-top: .75rem; font-weight: 600; color: var(--text); }
+    .empty-desc { margin-top: .25rem; font-size: 14px; color: var(--muted); }
   </style>
 </head>
 <body class="min-h-screen font-sans">
@@ -102,7 +109,7 @@
     </header>
 
     <main class="space-y-6">
-      <section data-page="upload" class="card p-6 rounded-xl shadow-sm">
+      <section data-page="upload" class="card accent-card p-6 rounded-xl shadow-sm">
         <h2 class="text-xl font-semibold mb-4 flex items-center">
           <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
           上传文件
@@ -127,7 +134,7 @@
         </div>
       </section>
 
-      <section data-page="library" class="hidden card p-6 rounded-xl shadow-sm">
+      <section data-page="library" class="hidden card accent-card p-6 rounded-xl shadow-sm">
         <h2 class="text-xl font-semibold mb-4 flex items-center">
           <svg class="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
           知识库结构
@@ -195,7 +202,7 @@
             </div>
           </div>
           <aside id="library-preview" class="hidden lg:block lg:col-span-1">
-            <div class="sticky top-4 rounded-xl p-4" style="border: 1px solid var(--border); background: rgba(148,163,184,0.08);">
+            <div class="sticky top-4 rounded-xl p-4 accent-card" style="border: 1px solid var(--border); background: rgba(148,163,184,0.08);">
               <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center gap-2 min-w-0">
                   <div class="text-sm font-semibold truncate" style="color: var(--text);" id="library-preview-title">预览</div>
@@ -209,7 +216,7 @@
         </div>
       </section>
 
-      <section data-page="search" class="hidden card p-6 rounded-xl shadow-sm">
+      <section data-page="search" class="hidden card accent-card p-6 rounded-xl shadow-sm">
         <h2 class="text-xl font-semibold mb-4 flex items-center">
           <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
           搜索
@@ -234,7 +241,7 @@
             <div class="text-sm muted">提示：点击“预览”将在右侧面板打开（桌面端）。</div>
           </div>
           <aside id="search-preview" class="hidden lg:block lg:col-span-1">
-            <div class="sticky top-4 rounded-xl p-4" style="border: 1px solid var(--border); background: rgba(148,163,184,0.08);">
+            <div class="sticky top-4 rounded-xl p-4 accent-card" style="border: 1px solid var(--border); background: rgba(148,163,184,0.08);">
               <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center gap-2 min-w-0">
                   <div class="text-sm font-semibold truncate" style="color: var(--text);" id="search-preview-title">预览</div>
@@ -248,13 +255,13 @@
         </div>
       </section>
 
-      <section data-page="trash" class="hidden card p-6 rounded-xl shadow-sm">
+      <section data-page="trash" class="hidden card accent-card p-6 rounded-xl shadow-sm">
         <h2 class="text-xl font-semibold mb-4 flex items-center">
           <svg class="w-5 h-5 mr-2" style="color: var(--muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14"></path></svg>
           回收站与设置
         </h2>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <section class="rounded-xl p-4" style="border: 1px solid var(--border); background: var(--card);">
+          <section class="rounded-xl p-4 accent-card" style="border: 1px solid var(--border); background: var(--card);">
             <div class="flex items-start justify-between gap-3">
               <div>
               <div class="text-sm font-semibold" style="color: var(--text);">回收站</div>
@@ -270,7 +277,7 @@
             <div id="trash-list-page" class="mt-4 max-h-[520px] overflow-y-auto"></div>
           </section>
 
-          <section class="rounded-xl p-4" style="border: 1px solid var(--border); background: var(--card);" id="settings-panel">
+          <section class="rounded-xl p-4 accent-card" style="border: 1px solid var(--border); background: var(--card);" id="settings-panel">
             <div class="text-sm font-semibold mb-3" style="color: var(--text);">账号设置</div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -860,6 +867,27 @@
       return escapeHtml(unsafe).replace(/`/g, '&#096;')
     }
 
+    function emptyIcon(name) {
+      const common = 'class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"'
+      if (name === 'upload') return `<svg ${common}><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>`
+      if (name === 'search') return `<svg ${common}><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>`
+      if (name === 'trash') return `<svg ${common}><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14"/></svg>`
+      if (name === 'star') return `<svg class="empty-icon" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.954a1 1 0 00.95.69h4.157c.969 0 1.371 1.24.588 1.81l-3.363 2.444a1 1 0 00-.364 1.118l1.286 3.954c.3.921-.755 1.688-1.539 1.118l-3.363-2.444a1 1 0 00-1.175 0l-3.363 2.444c-.783.57-1.838-.197-1.539-1.118l1.286-3.954a1 1 0 00-.364-1.118L2.07 9.381c-.783-.57-.38-1.81.588-1.81h4.157a1 1 0 00.95-.69l1.286-3.954z"/></svg>`
+      return `<svg ${common}><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 6v6m0 4h.01"/></svg>`
+    }
+
+    function renderEmptyState(opts) {
+      const icon = opts && opts.icon ? opts.icon : 'search'
+      const title = opts && opts.title ? opts.title : ''
+      const desc = opts && opts.desc ? opts.desc : ''
+      const primaryText = opts && opts.primaryText ? opts.primaryText : ''
+      const action = opts && opts.action ? opts.action : ''
+      const btn = primaryText && action
+        ? `<div class="mt-4"><button class="px-4 py-2 rounded-lg text-sm btn btn-primary motion-safe" data-empty-action="${escapeAttr(action)}">${escapeHtml(primaryText)}</button></div>`
+        : ''
+      return `<div class="empty-state">${emptyIcon(icon)}<div class="empty-title">${escapeHtml(title)}</div><div class="empty-desc">${escapeHtml(desc)}</div>${btn}</div>`
+    }
+
     function favoriteKey(category, filename) {
       return String(category || '') + '::' + String(filename || '')
     }
@@ -1131,8 +1159,9 @@
         trashCount.textContent = `共 ${items.length} 个条目（已选 ${selectedTrash.size}）`
         if (trashCountPage) trashCountPage.textContent = `共 ${items.length} 个，已选 ${selectedTrash.size}`
         if (!items.length) {
-          trashList.innerHTML = '<p class="text-sm text-gray-500 text-center py-10">回收站为空</p>'
-          if (trashListPage) trashListPage.innerHTML = '<p class="text-sm text-gray-500 text-center py-10">回收站为空</p>'
+          const html = renderEmptyState({ icon: 'trash', title: '回收站为空', desc: '这里会显示你删除的文件。', primaryText: '返回知识库', action: 'go-library' })
+          trashList.innerHTML = html
+          if (trashListPage) trashListPage.innerHTML = html
           return
         }
         const html = `
@@ -1217,7 +1246,7 @@
     async function loadStats() {
       const base = getApiBase()
       if (!base) {
-        kbStats.innerHTML = '<p class="text-gray-500 text-sm text-center py-8">请先填写后端地址</p>'
+        kbStats.innerHTML = renderEmptyState({ icon: 'search', title: '请先配置后端地址', desc: '当前前端无法连接到后端 API。' })
         return
       }
       try {
@@ -1225,7 +1254,7 @@
         const data = await response.json()
         await loadFilterOptions()
         if (!data || Object.keys(data).length === 0) {
-          kbStats.innerHTML = '<p class="text-gray-500 text-sm text-center py-8">知识库还是空的，快去上传文件吧！</p>'
+          kbStats.innerHTML = renderEmptyState({ icon: 'upload', title: '知识库还是空的', desc: '先去上传一些文件吧。', primaryText: '去上传', action: 'go-upload' })
           return
         }
         let html = ''
@@ -1272,7 +1301,13 @@
             </div>
           `
         }
-        kbStats.innerHTML = rendered ? html : '<p class="text-gray-500 text-sm text-center py-8">没有匹配的文件。</p>'
+        if (rendered) kbStats.innerHTML = html
+        else {
+          const onlyFav = !!(filterFavoritesCheckbox && filterFavoritesCheckbox.checked)
+          kbStats.innerHTML = onlyFav
+            ? renderEmptyState({ icon: 'star', title: '暂无收藏文件', desc: '去知识库列表点一下 ☆ 就能收藏。', primaryText: '取消只看收藏', action: 'disable-fav-library' })
+            : renderEmptyState({ icon: 'search', title: '没有匹配的文件', desc: '尝试清除筛选条件或刷新目录。', primaryText: '清除筛选', action: 'clear-filters' })
+        }
         updateBulkBar()
       } catch (error) {
         kbStats.innerHTML = `<p class="text-red-500 text-sm">加载失败: ${escapeHtml(error && error.message ? error.message : String(error))}</p>`
@@ -1353,7 +1388,10 @@
 
     function renderGroupedFiles(data) {
       if (!data || Object.keys(data).length === 0) {
-        kbStats.innerHTML = '<p class="text-gray-500 text-sm text-center py-8">没有匹配的文件。</p>'
+        const onlyFav = !!(filterFavoritesCheckbox && filterFavoritesCheckbox.checked)
+        kbStats.innerHTML = onlyFav
+          ? renderEmptyState({ icon: 'star', title: '暂无收藏文件', desc: '去知识库列表点一下 ☆ 就能收藏。', primaryText: '取消只看收藏', action: 'disable-fav-library' })
+          : renderEmptyState({ icon: 'search', title: '没有匹配的文件', desc: '尝试调整筛选条件。', primaryText: '清除筛选', action: 'clear-filters' })
         return
       }
       let html = ''
@@ -1396,7 +1434,13 @@
           </div>
         `
       }
-      kbStats.innerHTML = rendered ? html : '<p class="text-gray-500 text-sm text-center py-8">没有匹配的文件。</p>'
+      if (rendered) kbStats.innerHTML = html
+      else {
+        const onlyFav = !!(filterFavoritesCheckbox && filterFavoritesCheckbox.checked)
+        kbStats.innerHTML = onlyFav
+          ? renderEmptyState({ icon: 'star', title: '暂无收藏文件', desc: '去知识库列表点一下 ☆ 就能收藏。', primaryText: '取消只看收藏', action: 'disable-fav-library' })
+          : renderEmptyState({ icon: 'search', title: '没有匹配的文件', desc: '尝试调整筛选条件。', primaryText: '清除筛选', action: 'clear-filters' })
+      }
     }
 
     async function runSearch() {
@@ -1447,7 +1491,10 @@
       const resultsToShow = onlyFav ? results.filter(r => isFavorited(r.category || '', r.filename || '')) : results
       ;[searchResults, searchResults2].forEach(el => el && el.classList.remove('hidden'))
       if (!resultsToShow.length) {
-        ;[searchResults, searchResults2].forEach(el => el && (el.innerHTML = '<p class="text-sm text-gray-500">未找到匹配结果。</p>'))
+        const html = onlyFav
+          ? renderEmptyState({ icon: 'star', title: '暂无收藏结果', desc: '取消只看收藏，或先在知识库里收藏一些文件。', primaryText: '取消只看收藏', action: 'disable-fav-search' })
+          : renderEmptyState({ icon: 'search', title: '未找到匹配结果', desc: '换个关键词试试，或清空搜索条件。', primaryText: '清空搜索', action: 'clear-search' })
+        ;[searchResults, searchResults2].forEach(el => el && (el.innerHTML = html))
         kbStats.classList.add('hidden')
         return
       }
@@ -1562,6 +1609,44 @@
     }
     bindSearchResults(searchResults)
     bindSearchResults(searchResults2)
+
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-empty-action]')
+      if (!btn) return
+      const action = btn.getAttribute('data-empty-action') || ''
+      if (action === 'go-upload') {
+        location.hash = '#/upload'
+        setActiveTab('upload')
+        return
+      }
+      if (action === 'go-library') {
+        location.hash = '#/library'
+        setActiveTab('library')
+        return
+      }
+      if (action === 'clear-search') {
+        if (searchFavoritesCheckbox) searchFavoritesCheckbox.checked = false
+        clearSearch()
+        try { searchQueryInput.focus() } catch (e) {}
+        return
+      }
+      if (action === 'clear-filters') {
+        if (filterFavoritesCheckbox) filterFavoritesCheckbox.checked = false
+        clearFilters()
+        return
+      }
+      if (action === 'disable-fav-library') {
+        if (filterFavoritesCheckbox) filterFavoritesCheckbox.checked = false
+        if (filterActive) applyFilters()
+        else loadStats()
+        return
+      }
+      if (action === 'disable-fav-search') {
+        if (searchFavoritesCheckbox) searchFavoritesCheckbox.checked = false
+        runSearch()
+        return
+      }
+    })
 
     function isDesktopPreview() {
       try { return window.matchMedia && window.matchMedia('(min-width: 1024px)').matches } catch (e) { return false }
@@ -1714,7 +1799,7 @@
             <div class="text-sm muted">共 ${items.length} 题（预览前 10 题）</div>
             <a class="text-sm" style="color: var(--primary);" href="${url}" download="${escapeAttr(outName || 'questions.json')}">下载 JSON</a>
           </div>
-          <div class="space-y-3">${showItems || '<p class="text-sm text-gray-500">未识别到题目。</p>'}</div>
+          <div class="space-y-3">${showItems || renderEmptyState({ icon: 'search', title: '未识别到题目', desc: '可以尝试换一个文件，或先查看原文件内容。' })}</div>
         `
         previewModal.classList.remove('hidden')
       } catch (e) {
