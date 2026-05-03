@@ -608,6 +608,7 @@
   <script src="./favorites_tools.js"></script>
   <script src="./cache_tools.js"></script>
   <script src="./download_internals.js"></script>
+  <script src="./preview_tools.js"></script>
   <script src="./upload_precheck.js"></script>
   <script src="./mobile_preview.js"></script>
   <script>
@@ -773,6 +774,7 @@
     const downloadFileFn = (globalThis && globalThis._downloadInternals && typeof globalThis._downloadInternals.downloadFile === 'function')
       ? globalThis._downloadInternals.downloadFile
       : null
+    const hydrateRawPreviewFn = typeof hydrateRawPreview === 'function' ? hydrateRawPreview : null
     const shouldUseCacheFn = typeof shouldUseCache === 'function' ? shouldUseCache : (() => false)
     const makeSearchCacheKeyFn = typeof makeSearchCacheKey === 'function' ? makeSearchCacheKey : (() => '')
     const readJson = (key, fallback) => {
@@ -1275,7 +1277,7 @@
                         <span class="truncate max-w-[420px]" title="${escapeAttr(filename)}">${escapeHtml(filename)}</span>
                         ${missingChip}
                       </div>
-                      <div class="hidden group-hover:flex space-x-2">${actions}</div>
+                      <div class="hidden group-hover:flex gap-2 flex-wrap justify-end">${actions}</div>
                     </li>
                   `
                 }).join('')}
@@ -1882,7 +1884,7 @@
                       <span class="truncate max-w-[220px]" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
                       ${f.has_meta ? '<span class="ml-2 chip chip-accent">已提取标签</span>' : ''}
                     </div>
-                    <div class="hidden group-hover:flex space-x-2">
+                    <div class="hidden group-hover:flex gap-2 flex-wrap justify-end">
                     <button class="${favCls} text-xs motion-safe star-hover" data-action="favorite" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}" aria-label="收藏">${favIcon}</button>
                       <button class="btn btn-sm motion-safe" style="color: var(--muted);" data-action="copy-name" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">复制文件名</button>
                       <button class="btn btn-sm motion-safe text-blue-500 hover:text-blue-700" data-action="preview" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">预览</button>
@@ -2020,7 +2022,7 @@
                     <span class="truncate max-w-[220px]" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
                     ${f.has_meta ? '<span class="ml-2 chip chip-accent">已提取标签</span>' : ''}
                   </div>
-                  <div class="hidden group-hover:flex space-x-2">
+                  <div class="hidden group-hover:flex gap-2 flex-wrap justify-end">
                     <button class="${favCls} text-xs motion-safe star-hover" data-action="favorite" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}" aria-label="收藏">${favIcon}</button>
                     <button class="btn btn-sm motion-safe" style="color: var(--muted);" data-action="copy-name" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">复制文件名</button>
                     <button class="btn btn-sm motion-safe text-blue-500 hover:text-blue-700" data-action="preview" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">预览</button>
@@ -2471,7 +2473,7 @@
       const rawUrl = data.raw_url ? (base + data.raw_url) : ''
       const download = rawUrl ? `
         <div class="flex items-center gap-2 flex-wrap">
-          <a class="text-sm" style="color: var(--primary);" href="${escapeAttr(rawUrl)}" target="_blank" rel="noopener">下载/打开原文件</a>
+          <button class="btn btn-soft btn-sm motion-safe" data-action="download-raw" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename)}">下载原文件</button>
           <button class="btn btn-soft btn-sm motion-safe" data-action="copy-link" data-url="${escapeAttr(rawUrl)}">复制链接</button>
         </div>
       ` : ''
@@ -2479,9 +2481,11 @@
         el.innerHTML = `
           <div class="space-y-3">
             <div>${download}</div>
-            <img src="${escapeAttr(rawUrl)}" class="max-w-full rounded-lg card-border bg-card" alt="preview">
+            <div class="text-sm muted">加载预览中…</div>
+            <img data-preview-raw="1" class="max-w-full rounded-lg card-border bg-card" alt="preview">
           </div>
         `
+        if (hydrateRawPreviewFn && data.raw_url) void hydrateRawPreviewFn({ container: el, rawPath: data.raw_url, apiFetch, toastError: toastErrorFn })
         return
       }
       if (rawUrl && ext === '.pdf') {
@@ -2491,9 +2495,11 @@
               <div>${download}</div>
               <button class="btn btn-soft btn-sm motion-safe" data-action="preview-derived" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename + '.md')}">查看提取文本</button>
             </div>
-            <iframe src="${escapeAttr(rawUrl)}" class="w-full h-[70vh] rounded-lg card-border bg-card"></iframe>
+            <div class="text-sm muted">加载预览中…</div>
+            <iframe data-preview-raw="1" class="w-full h-[70vh] rounded-lg card-border bg-card"></iframe>
           </div>
         `
+        if (hydrateRawPreviewFn && data.raw_url) void hydrateRawPreviewFn({ container: el, rawPath: data.raw_url, apiFetch, toastError: toastErrorFn })
         return
       }
       if (ext === '.doc' || ext === '.docx') {
@@ -2763,6 +2769,14 @@
       const btn = e.target.closest('button')
       if (!btn) return
       const action = btn.getAttribute('data-action') || ''
+      if (action === 'download-raw') {
+        const category = btn.getAttribute('data-category') || ''
+        const filename = btn.getAttribute('data-filename') || ''
+        if (!category || !filename) return
+        if (!downloadFileFn) { toastErrorFn('下载失败', '下载功能未就绪'); return }
+        await downloadFileFn({ category, filename, btn, apiFetch, toastSuccess: toastSuccessFn, toastError: toastErrorFn, withDisabled: withDisabledFn })
+        return
+      }
       if (action === 'copy-link') {
         const url = btn.getAttribute('data-url') || ''
         if (url) await copyWithToast(url)
@@ -2779,6 +2793,14 @@
         const btn = e.target.closest('button')
         if (!btn) return
         const action = btn.getAttribute('data-action') || ''
+        if (action === 'download-raw') {
+          const category = btn.getAttribute('data-category') || ''
+          const filename = btn.getAttribute('data-filename') || ''
+          if (!category || !filename) return
+          if (!downloadFileFn) { toastErrorFn('下载失败', '下载功能未就绪'); return }
+          await downloadFileFn({ category, filename, btn, apiFetch, toastSuccess: toastSuccessFn, toastError: toastErrorFn, withDisabled: withDisabledFn })
+          return
+        }
         if (action === 'copy-link') {
           const url = btn.getAttribute('data-url') || ''
           if (url) await copyWithToast(url)
@@ -2803,6 +2825,14 @@
         const btn = e.target.closest('button')
         if (!btn) return
         const action = btn.getAttribute('data-action') || ''
+        if (action === 'download-raw') {
+          const category = btn.getAttribute('data-category') || ''
+          const filename = btn.getAttribute('data-filename') || ''
+          if (!category || !filename) return
+          if (!downloadFileFn) { toastErrorFn('下载失败', '下载功能未就绪'); return }
+          await downloadFileFn({ category, filename, btn, apiFetch, toastSuccess: toastSuccessFn, toastError: toastErrorFn, withDisabled: withDisabledFn })
+          return
+        }
         if (action === 'copy-link') {
           const url = btn.getAttribute('data-url') || ''
           if (url) await copyWithToast(url)
@@ -2821,6 +2851,14 @@
         const btn = e.target.closest('button')
         if (!btn) return
         const action = btn.getAttribute('data-action') || ''
+        if (action === 'download-raw') {
+          const category = btn.getAttribute('data-category') || ''
+          const filename = btn.getAttribute('data-filename') || ''
+          if (!category || !filename) return
+          if (!downloadFileFn) { toastErrorFn('下载失败', '下载功能未就绪'); return }
+          await downloadFileFn({ category, filename, btn, apiFetch, toastSuccess: toastSuccessFn, toastError: toastErrorFn, withDisabled: withDisabledFn })
+          return
+        }
         if (action === 'copy-link') {
           const url = btn.getAttribute('data-url') || ''
           if (url) await copyWithToast(url)
