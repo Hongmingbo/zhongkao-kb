@@ -569,6 +569,7 @@
   <script src="./feedback.js"></script>
   <script src="./upload_queue.js"></script>
   <script src="./usability.js"></script>
+  <script src="./safety.js"></script>
   <script src="./mobile_preview.js"></script>
   <script>
     const dropZone = document.getElementById('drop-zone')
@@ -714,6 +715,10 @@
     const confirmDialogFn = typeof confirmDialog === 'function' ? confirmDialog : async (opts) => confirm(String((opts && (opts.message || opts.title)) || '请确认'))
     const copyTextFn = typeof copyText === 'function' ? copyText : async () => false
     const installGlobalShortcutsFn = typeof installGlobalShortcuts === 'function' ? installGlobalShortcuts : null
+    const validateUsernameFn = typeof validateUsername === 'function' ? validateUsername : (v) => ({ ok: true, value: String(v || '').trim() })
+    const validatePasswordFn = typeof validatePassword === 'function' ? validatePassword : (v) => ({ ok: true, value: String(v || '') })
+    const validateRenameFn = typeof validateRename === 'function' ? validateRename : (v) => ({ ok: true, value: String(v || '').trim() })
+    const withDisabledFn = typeof withDisabled === 'function' ? withDisabled : async (_btn, fn) => await fn()
     const readJson = (key, fallback) => {
       try {
         const raw = localStorage.getItem(key)
@@ -1496,7 +1501,7 @@
     }
 
     async function deleteTrash(id) {
-      const ok = await confirmDialogFn({ title: '彻底删除文件？', message: '此操作不可恢复。', confirmText: '删除', tone: 'danger' })
+      const ok = await confirmDialogFn({ title: '彻底删除文件？', message: '将永久删除该文件，且不可恢复。', confirmText: '删除', tone: 'danger' })
       if (!ok) return
       try {
         const r = await apiFetch('/api/trash/' + encodeURIComponent(id), { method: 'DELETE' })
@@ -1513,7 +1518,7 @@
     }
 
     async function clearTrashAll() {
-      const ok = await confirmDialogFn({ title: '清空回收站？', message: '此操作不可恢复。', confirmText: '清空', tone: 'danger' })
+      const ok = await confirmDialogFn({ title: '清空回收站？', message: '将永久删除回收站内所有文件，且不可恢复。', confirmText: '清空', tone: 'danger' })
       if (!ok) return
       try {
         const r = await apiFetch('/api/trash/clear', { method: 'DELETE' })
@@ -1863,10 +1868,10 @@
       if (!action || !category || !filename) return
       if (action === 'copy-name') { await copyWithToast(filename); return }
       if (action === 'preview') await previewFile(category, filename)
-      if (action === 'favorite') await toggleFavorite(category, filename)
-      if (action === 'split') await splitFile(category, filename)
+      if (action === 'favorite') await withDisabledFn(btn, async () => { await toggleFavorite(category, filename) })
+      if (action === 'split') await withDisabledFn(btn, async () => { await splitFile(category, filename) })
       if (action === 'rename') await renameFile(category, filename)
-      if (action === 'delete') await deleteFile(category, filename)
+      if (action === 'delete') await withDisabledFn(btn, async () => { await deleteFile(category, filename) })
     })
 
     kbStats.addEventListener('change', (e) => {
@@ -1891,8 +1896,8 @@
       }
       const id = btn.getAttribute('data-id')
       if (!id) return
-      if (action === 'trash-restore') await restoreTrash(id)
-      if (action === 'trash-delete') await deleteTrash(id)
+      if (action === 'trash-restore') await withDisabledFn(btn, async () => { await restoreTrash(id) })
+      if (action === 'trash-delete') await withDisabledFn(btn, async () => { await deleteTrash(id) })
     })
 
     trashList.addEventListener('change', (e) => {
@@ -1918,8 +1923,8 @@
         }
         const id = btn.getAttribute('data-id')
         if (!id) return
-        if (action === 'trash-restore') await restoreTrash(id)
-        if (action === 'trash-delete') await deleteTrash(id)
+        if (action === 'trash-restore') await withDisabledFn(btn, async () => { await restoreTrash(id) })
+        if (action === 'trash-delete') await withDisabledFn(btn, async () => { await deleteTrash(id) })
       })
       trashListPage.addEventListener('change', (e) => {
         const el = e.target
@@ -2162,37 +2167,40 @@
       showRenameModal(category, oldFilename)
     }
 
-    async function doRename() {
+    async function doRename(btnEl) {
       const category = renameTarget.category
       const old_filename = renameTarget.filename
-      const new_filename = (renameInput.value || '').trim()
+      const vn = validateRenameFn(renameInput.value || '')
+      const new_filename = vn.ok ? vn.value : ''
       if (!category || !old_filename) return
-      if (!new_filename) { renameMsg.textContent = '请输入新文件名'; renameMsg.className = 'text-sm text-red-700'; return }
-      try {
-        const r = await apiFetch('/api/file/rename', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ category, old_filename, new_filename }),
-        })
-        const data = await r.json().catch(() => ({}))
-        if (!r.ok || data.status !== 'success') {
-          renameMsg.textContent = (data && data.detail) || '重命名失败'
+      if (!vn.ok) { renameMsg.textContent = vn.reason || '文件名不合法'; renameMsg.className = 'text-sm text-red-700'; return }
+      await withDisabledFn(btnEl || renameApplyBtn, async () => {
+        try {
+          const r = await apiFetch('/api/file/rename', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ category, old_filename, new_filename }),
+          })
+          const data = await r.json().catch(() => ({}))
+          if (!r.ok || data.status !== 'success') {
+            renameMsg.textContent = (data && data.detail) || '重命名失败'
+            renameMsg.className = 'text-sm text-red-700'
+            return
+          }
+          const finalName = data.new_filename || new_filename
+          renameMsg.textContent = `已重命名为：${finalName}`
+          renameMsg.className = 'text-sm text-green-700'
+          selectedKb.delete(category + '::' + old_filename)
+          selectedKb.add(category + '::' + finalName)
+          updateBulkBar()
+          if (filterActive) await applyFilters()
+          else await loadStats()
+          setTimeout(hideRenameModal, 400)
+        } catch (e) {
+          renameMsg.textContent = '重命名失败'
           renameMsg.className = 'text-sm text-red-700'
-          return
         }
-        const finalName = data.new_filename || new_filename
-        renameMsg.textContent = `已重命名为：${finalName}`
-        renameMsg.className = 'text-sm text-green-700'
-        selectedKb.delete(category + '::' + old_filename)
-        selectedKb.add(category + '::' + finalName)
-        updateBulkBar()
-        if (filterActive) await applyFilters()
-        else await loadStats()
-        setTimeout(hideRenameModal, 400)
-      } catch (e) {
-        renameMsg.textContent = '重命名失败'
-        renameMsg.className = 'text-sm text-red-700'
-      }
+      })
     }
 
     function computeBatchRenamePlan() {
@@ -2279,7 +2287,7 @@
 
     async function deleteFile(category, filename) {
       const base = getApiBase()
-      const ok = await confirmDialogFn({ title: '移入回收站？', message: `确定要删除文件 "${filename}" 吗？`, confirmText: '删除', tone: 'danger' })
+      const ok = await confirmDialogFn({ title: '移入回收站？', message: `将把文件“${filename}”移入回收站，可在回收站恢复。`, confirmText: '移入回收站', tone: 'danger' })
       if (!ok) return
       try {
         const url = '/api/file/' + encodeURIComponent(category) + '/' + encodeURIComponent(filename)
@@ -2384,76 +2392,80 @@
     trashBtn.addEventListener('click', async () => { location.hash = '#/trash'; await loadTrash() })
     closeTrashBtn.addEventListener('click', hideTrashModal)
     trashModal.addEventListener('click', (e) => { if (e.target === trashModal) hideTrashModal() })
-    clearTrashBtn.addEventListener('click', clearTrashAll)
-    if (clearTrashBtnPage) clearTrashBtnPage.addEventListener('click', clearTrashAll)
+    clearTrashBtn.addEventListener('click', async () => { await withDisabledFn(clearTrashBtn, async () => { await clearTrashAll() }) })
+    if (clearTrashBtnPage) clearTrashBtnPage.addEventListener('click', async () => { await withDisabledFn(clearTrashBtnPage, async () => { await clearTrashAll() }) })
     bulkCancelBtn.addEventListener('click', () => { selectedKb.clear(); updateBulkBar(); void loadStats() })
     bulkTrashBtn.addEventListener('click', async () => {
-      if (!selectedKb.size) return
-      {
-        const ok = await confirmDialogFn({ title: '批量移入回收站？', message: `确定将已选择的 ${selectedKb.size} 个文件移入回收站吗？`, confirmText: '移入', tone: 'danger' })
-        if (!ok) return
-      }
-      const items = Array.from(selectedKb).map(k => {
-        const parts = k.split('::')
-        return { category: parts[0] || '', filename: parts.slice(1).join('::') || '' }
-      })
-      try {
-        const r = await apiFetch('/api/trash/batch_delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items }),
-        })
-        const data = await r.json().catch(() => ({}))
-        if (!r.ok || data.status !== 'success') {
-          toastErrorFn('批量操作失败', (data && data.detail) || '')
-          return
+      await withDisabledFn(bulkTrashBtn, async () => {
+        if (!selectedKb.size) return
+        {
+          const ok = await confirmDialogFn({ title: '批量移入回收站？', message: `将把已选择的 ${selectedKb.size} 个文件移入回收站，可在回收站恢复。`, confirmText: '移入回收站', tone: 'danger' })
+          if (!ok) return
         }
-        const results = Array.isArray(data.results) ? data.results : []
-        const okCount = results.filter(x => x && x.ok).length
-        const failCount = results.length - okCount
-        toastInfoFn('已移入回收站', `成功 ${okCount}，失败 ${failCount}`)
-        selectedKb.clear()
-        updateBulkBar()
-        if (filterActive) await applyFilters()
-        else await loadStats()
-      } catch (e) {
-        toastErrorFn('批量操作失败', e && e.message ? e.message : '')
-      }
+        const items = Array.from(selectedKb).map(k => {
+          const parts = k.split('::')
+          return { category: parts[0] || '', filename: parts.slice(1).join('::') || '' }
+        })
+        try {
+          const r = await apiFetch('/api/trash/batch_delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items }),
+          })
+          const data = await r.json().catch(() => ({}))
+          if (!r.ok || data.status !== 'success') {
+            toastErrorFn('批量操作失败', (data && data.detail) || '')
+            return
+          }
+          const results = Array.isArray(data.results) ? data.results : []
+          const okCount = results.filter(x => x && x.ok).length
+          const failCount = results.length - okCount
+          toastInfoFn('已移入回收站', `成功 ${okCount}，失败 ${failCount}`)
+          selectedKb.clear()
+          updateBulkBar()
+          if (filterActive) await applyFilters()
+          else await loadStats()
+        } catch (e) {
+          toastErrorFn('批量操作失败', e && e.message ? e.message : '')
+        }
+      })
     })
     bulkMoveBtn.addEventListener('click', async () => {
-      if (!selectedKb.size) return
-      const target_category = (bulkTargetCategorySelect.value || '').trim()
-      if (!target_category) { toastInfoFn('请选择目标学科'); return }
-      {
-        const ok = await confirmDialogFn({ title: '批量移动文件？', message: `确定将已选择的 ${selectedKb.size} 个文件移动到 "${target_category}" 吗？`, confirmText: '移动', tone: 'primary' })
-        if (!ok) return
-      }
-      const items = Array.from(selectedKb).map(k => {
-        const parts = k.split('::')
-        return { category: parts[0] || '', filename: parts.slice(1).join('::') || '' }
-      })
-      try {
-        const r = await apiFetch('/api/file/batch_move', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items, target_category }),
-        })
-        const data = await r.json().catch(() => ({}))
-        if (!r.ok || data.status !== 'success') {
-          toastErrorFn('批量移动失败', (data && data.detail) || '')
-          return
+      await withDisabledFn(bulkMoveBtn, async () => {
+        if (!selectedKb.size) return
+        const target_category = (bulkTargetCategorySelect.value || '').trim()
+        if (!target_category) { toastInfoFn('请选择目标学科'); return }
+        {
+          const ok = await confirmDialogFn({ title: '批量移动文件？', message: `将把已选择的 ${selectedKb.size} 个文件移动到“${target_category}”。`, confirmText: '移动', tone: 'primary' })
+          if (!ok) return
         }
-        const results = Array.isArray(data.results) ? data.results : []
-        const okCount = results.filter(x => x && x.ok).length
-        const failCount = results.length - okCount
-        toastInfoFn('已移动', `成功 ${okCount}，失败 ${failCount}`)
-        selectedKb.clear()
-        updateBulkBar()
-        if (filterActive) await applyFilters()
-        else await loadStats()
-      } catch (e) {
-        toastErrorFn('批量移动失败', e && e.message ? e.message : '')
-      }
+        const items = Array.from(selectedKb).map(k => {
+          const parts = k.split('::')
+          return { category: parts[0] || '', filename: parts.slice(1).join('::') || '' }
+        })
+        try {
+          const r = await apiFetch('/api/file/batch_move', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items, target_category }),
+          })
+          const data = await r.json().catch(() => ({}))
+          if (!r.ok || data.status !== 'success') {
+            toastErrorFn('批量移动失败', (data && data.detail) || '')
+            return
+          }
+          const results = Array.isArray(data.results) ? data.results : []
+          const okCount = results.filter(x => x && x.ok).length
+          const failCount = results.length - okCount
+          toastInfoFn('已移动', `成功 ${okCount}，失败 ${failCount}`)
+          selectedKb.clear()
+          updateBulkBar()
+          if (filterActive) await applyFilters()
+          else await loadStats()
+        } catch (e) {
+          toastErrorFn('批量移动失败', e && e.message ? e.message : '')
+        }
+      })
     })
     bulkMetaBtn.addEventListener('click', () => {
       if (!selectedKb.size) return
@@ -2467,160 +2479,170 @@
     trashClearSelectedBtn.addEventListener('click', () => { selectedTrash.clear(); void loadTrash() })
     if (trashClearSelectedBtnPage) trashClearSelectedBtnPage.addEventListener('click', () => { selectedTrash.clear(); void loadTrash() })
     trashRestoreSelectedBtn.addEventListener('click', async () => {
-      if (!selectedTrash.size) return
-      const ids = Array.from(selectedTrash)
-      try {
-        const r = await apiFetch('/api/trash/batch_restore', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ids }),
-        })
-        const data = await r.json().catch(() => ({}))
-        if (!r.ok || data.status !== 'success') {
-          toastErrorFn('批量恢复失败', (data && data.detail) || '')
-          return
+      await withDisabledFn(trashRestoreSelectedBtn, async () => {
+        if (!selectedTrash.size) return
+        const ids = Array.from(selectedTrash)
+        try {
+          const r = await apiFetch('/api/trash/batch_restore', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids }),
+          })
+          const data = await r.json().catch(() => ({}))
+          if (!r.ok || data.status !== 'success') {
+            toastErrorFn('批量恢复失败', (data && data.detail) || '')
+            return
+          }
+          const results = Array.isArray(data.results) ? data.results : []
+          const okCount = results.filter(x => x && x.ok).length
+          const failCount = results.length - okCount
+          toastInfoFn('已恢复', `成功 ${okCount}，失败 ${failCount}`)
+          selectedTrash.clear()
+          await loadTrash()
+          if (filterActive) await applyFilters()
+          else await loadStats()
+        } catch (e) {
+          toastErrorFn('批量恢复失败', e && e.message ? e.message : '')
         }
-        const results = Array.isArray(data.results) ? data.results : []
-        const okCount = results.filter(x => x && x.ok).length
-        const failCount = results.length - okCount
-        toastInfoFn('已恢复', `成功 ${okCount}，失败 ${failCount}`)
-        selectedTrash.clear()
-        await loadTrash()
-        if (filterActive) await applyFilters()
-        else await loadStats()
-      } catch (e) {
-        toastErrorFn('批量恢复失败', e && e.message ? e.message : '')
-      }
+      })
     })
-    if (trashRestoreSelectedBtnPage) trashRestoreSelectedBtnPage.addEventListener('click', async () => { await (async () => {
-      if (!selectedTrash.size) return
-      const items = Array.from(selectedTrash).slice(0, 500).map(id => ({ id }))
-      try {
-        const r = await apiFetch('/api/trash/batch_restore', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items }),
-        })
-        const data = await r.json().catch(() => ({}))
-        if (!r.ok || data.status !== 'success') {
-          toastErrorFn('批量操作失败', (data && data.detail) || '')
-          return
+    if (trashRestoreSelectedBtnPage) trashRestoreSelectedBtnPage.addEventListener('click', async () => {
+      await withDisabledFn(trashRestoreSelectedBtnPage, async () => {
+        if (!selectedTrash.size) return
+        const items = Array.from(selectedTrash).slice(0, 500).map(id => ({ id }))
+        try {
+          const r = await apiFetch('/api/trash/batch_restore', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items }),
+          })
+          const data = await r.json().catch(() => ({}))
+          if (!r.ok || data.status !== 'success') {
+            toastErrorFn('批量操作失败', (data && data.detail) || '')
+            return
+          }
+          selectedTrash.clear()
+          toastSuccessFn('已恢复')
+          await loadTrash()
+          if (filterActive) await applyFilters()
+          else await loadStats()
+        } catch (e) {
+          toastErrorFn('批量操作失败', e && e.message ? e.message : '')
         }
-        selectedTrash.clear()
-        toastSuccessFn('已恢复')
-        await loadTrash()
-        if (filterActive) await applyFilters()
-        else await loadStats()
-      } catch (e) {
-        toastErrorFn('批量操作失败', e && e.message ? e.message : '')
-      }
-    })() })
+      })
+    })
     trashPurgeSelectedBtn.addEventListener('click', async () => {
-      if (!selectedTrash.size) return
-      {
-        const ok = await confirmDialogFn({ title: '彻底删除已选文件？', message: '此操作不可恢复。', confirmText: '删除', tone: 'danger' })
-        if (!ok) return
-      }
-      const ids = Array.from(selectedTrash)
-      try {
-        const r = await apiFetch('/api/trash/batch_purge', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ids }),
-        })
-        const data = await r.json().catch(() => ({}))
-        if (!r.ok || data.status !== 'success') {
-          toastErrorFn('批量删除失败', (data && data.detail) || '')
-          return
+      await withDisabledFn(trashPurgeSelectedBtn, async () => {
+        if (!selectedTrash.size) return
+        {
+          const ok = await confirmDialogFn({ title: '彻底删除已选文件？', message: `将永久删除已选择的 ${selectedTrash.size} 个文件，且不可恢复。`, confirmText: '彻底删除', tone: 'danger' })
+          if (!ok) return
         }
-        const results = Array.isArray(data.results) ? data.results : []
-        const okCount = results.filter(x => x && x.ok).length
-        const failCount = results.length - okCount
-        toastInfoFn('已删除', `成功 ${okCount}，失败 ${failCount}`)
-        selectedTrash.clear()
-        await loadTrash()
-      } catch (e) {
-        toastErrorFn('批量删除失败', e && e.message ? e.message : '')
-      }
+        const ids = Array.from(selectedTrash)
+        try {
+          const r = await apiFetch('/api/trash/batch_purge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids }),
+          })
+          const data = await r.json().catch(() => ({}))
+          if (!r.ok || data.status !== 'success') {
+            toastErrorFn('批量删除失败', (data && data.detail) || '')
+            return
+          }
+          const results = Array.isArray(data.results) ? data.results : []
+          const okCount = results.filter(x => x && x.ok).length
+          const failCount = results.length - okCount
+          toastInfoFn('已删除', `成功 ${okCount}，失败 ${failCount}`)
+          selectedTrash.clear()
+          await loadTrash()
+        } catch (e) {
+          toastErrorFn('批量删除失败', e && e.message ? e.message : '')
+        }
+      })
     })
-    if (trashPurgeSelectedBtnPage) trashPurgeSelectedBtnPage.addEventListener('click', async () => { await (async () => {
-      if (!selectedTrash.size) return
-      {
-        const ok = await confirmDialogFn({ title: '彻底删除已选文件？', message: `确定彻底删除已选择的 ${selectedTrash.size} 个文件吗？此操作不可恢复。`, confirmText: '删除', tone: 'danger' })
-        if (!ok) return
-      }
-      const items = Array.from(selectedTrash).slice(0, 500).map(id => ({ id }))
-      try {
-        const r = await apiFetch('/api/trash/batch_purge', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items }),
-        })
-        const data = await r.json().catch(() => ({}))
-        if (!r.ok || data.status !== 'success') {
-          toastErrorFn('批量操作失败', (data && data.detail) || '')
-          return
+    if (trashPurgeSelectedBtnPage) trashPurgeSelectedBtnPage.addEventListener('click', async () => {
+      await withDisabledFn(trashPurgeSelectedBtnPage, async () => {
+        if (!selectedTrash.size) return
+        {
+          const ok = await confirmDialogFn({ title: '彻底删除已选文件？', message: `将永久删除已选择的 ${selectedTrash.size} 个文件，且不可恢复。`, confirmText: '彻底删除', tone: 'danger' })
+          if (!ok) return
         }
-        selectedTrash.clear()
-        toastSuccessFn('已删除')
-        await loadTrash()
-      } catch (e) {
-        toastErrorFn('批量操作失败', e && e.message ? e.message : '')
-      }
-    })() })
+        const items = Array.from(selectedTrash).slice(0, 500).map(id => ({ id }))
+        try {
+          const r = await apiFetch('/api/trash/batch_purge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items }),
+          })
+          const data = await r.json().catch(() => ({}))
+          if (!r.ok || data.status !== 'success') {
+            toastErrorFn('批量操作失败', (data && data.detail) || '')
+            return
+          }
+          selectedTrash.clear()
+          toastSuccessFn('已删除')
+          await loadTrash()
+        } catch (e) {
+          toastErrorFn('批量操作失败', e && e.message ? e.message : '')
+        }
+      })
+    })
     closeMetaBtn.addEventListener('click', hideMetaModal)
     metaModal.addEventListener('click', (e) => { if (e.target === metaModal) hideMetaModal() })
     metaApplyBtn.addEventListener('click', async () => {
-      if (!selectedKb.size) return
-      const patch = {}
-      const year = (metaYearInput.value || '').trim()
-      const region = (metaRegionInput.value || '').trim()
-      const type = (metaTypeInput.value || '').trim()
-      if (year) patch.year = year
-      if (region) patch.region = region
-      if (type) patch.type = type
-      if (!Object.keys(patch).length) {
-        metaMsg.textContent = '请至少填写一个字段'
-        metaMsg.className = 'text-sm text-red-700'
-        return
-      }
-
-      const items = Array.from(selectedKb).map(k => {
-        const parts = k.split('::')
-        return { category: parts[0] || '', filename: parts.slice(1).join('::') || '' }
-      })
-
-      try {
-        const r = await apiFetch('/api/meta/batch_update', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items, patch }),
-        })
-        const data = await r.json().catch(() => ({}))
-        if (!r.ok || data.status !== 'success') {
-          metaMsg.textContent = (data && data.detail) || '批量更新失败'
+      await withDisabledFn(metaApplyBtn, async () => {
+        if (!selectedKb.size) return
+        const patch = {}
+        const year = (metaYearInput.value || '').trim()
+        const region = (metaRegionInput.value || '').trim()
+        const type = (metaTypeInput.value || '').trim()
+        if (year) patch.year = year
+        if (region) patch.region = region
+        if (type) patch.type = type
+        if (!Object.keys(patch).length) {
+          metaMsg.textContent = '请至少填写一个字段'
           metaMsg.className = 'text-sm text-red-700'
           return
         }
-        const results = Array.isArray(data.results) ? data.results : []
-        const okCount = results.filter(x => x && x.ok).length
-        const failCount = results.length - okCount
-        metaMsg.textContent = `更新完成：成功 ${okCount}，失败 ${failCount}`
-        metaMsg.className = failCount ? 'text-sm text-amber-700' : 'text-sm text-green-700'
-        if (filterActive) await applyFilters()
-        else await loadStats()
-      } catch (e) {
-        metaMsg.textContent = '批量更新失败'
-        metaMsg.className = 'text-sm text-red-700'
-      }
+
+        const items = Array.from(selectedKb).map(k => {
+          const parts = k.split('::')
+          return { category: parts[0] || '', filename: parts.slice(1).join('::') || '' }
+        })
+
+        try {
+          const r = await apiFetch('/api/meta/batch_update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items, patch }),
+          })
+          const data = await r.json().catch(() => ({}))
+          if (!r.ok || data.status !== 'success') {
+            metaMsg.textContent = (data && data.detail) || '批量更新失败'
+            metaMsg.className = 'text-sm text-red-700'
+            return
+          }
+          const results = Array.isArray(data.results) ? data.results : []
+          const okCount = results.filter(x => x && x.ok).length
+          const failCount = results.length - okCount
+          metaMsg.textContent = `更新完成：成功 ${okCount}，失败 ${failCount}`
+          metaMsg.className = failCount ? 'text-sm text-amber-700' : 'text-sm text-green-700'
+          if (filterActive) await applyFilters()
+          else await loadStats()
+        } catch (e) {
+          metaMsg.textContent = '批量更新失败'
+          metaMsg.className = 'text-sm text-red-700'
+        }
+      })
     })
     closeRenameBtn.addEventListener('click', hideRenameModal)
     renameModal.addEventListener('click', (e) => { if (e.target === renameModal) hideRenameModal() })
-    renameApplyBtn.addEventListener('click', doRename)
-    renameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doRename() })
+    renameApplyBtn.addEventListener('click', async () => { await doRename(renameApplyBtn) })
+    renameInput.addEventListener('keydown', async (e) => { if (e.key === 'Enter') await doRename(renameApplyBtn) })
     closeBatchRenameBtn.addEventListener('click', hideBatchRenameModal)
     batchRenameModal.addEventListener('click', (e) => { if (e.target === batchRenameModal) hideBatchRenameModal() })
-    brApplyBtn.addEventListener('click', doBatchRename)
+    brApplyBtn.addEventListener('click', async () => { await withDisabledFn(brApplyBtn, async () => { await doBatchRename() }) })
     searchBtn.addEventListener('click', runSearch)
     clearSearchBtn.addEventListener('click', clearSearch)
     searchQueryInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch() })
@@ -2634,61 +2656,68 @@
     authModal.addEventListener('click', (e) => { if (e.target === authModal) hideAuthModal() })
 
     loginBtn.addEventListener('click', async () => {
-      const username = (loginUsername.value || '').trim()
-      const password = loginPassword.value || ''
-      if (!username || !password) { setAuthMsg('请输入用户名和密码。', false); return }
-      try {
-        const r = await fetch(API_BASE + '/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password }),
-        })
-        const data = await r.json().catch(() => ({}))
-        if (!r.ok || data.status !== 'success') {
-          setAuthMsg((data && data.detail) || '登录失败', false)
-          return
+      await withDisabledFn(loginBtn, async () => {
+        const u = validateUsernameFn(loginUsername.value || '')
+        const p = validatePasswordFn(loginPassword.value || '')
+        if (!u.ok) { setAuthMsg(u.reason || '用户名不合法', false); return }
+        if (!p.ok) { setAuthMsg(p.reason || '密码不合法', false); return }
+        try {
+          const r = await fetch(API_BASE + '/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: u.value, password: p.value }),
+          })
+          const data = await r.json().catch(() => ({}))
+          if (!r.ok || data.status !== 'success') {
+            setAuthMsg((data && data.detail) || '登录失败', false)
+            return
+          }
+          setToken(data.token)
+          const rMe = await apiFetch('/api/auth/me')
+          const me = await rMe.json().catch(() => ({}))
+          if (rMe.ok && me && me.username) {
+            renderUserBar(me)
+            await loadAvatar()
+          } else {
+            renderUserBar(data.user)
+            await loadAvatar()
+          }
+          hideAuthModal()
+          await loadFavorites()
+          await loadStats()
+        } catch (e) {
+          setAuthMsg('登录失败', false)
         }
-        setToken(data.token)
-        const rMe = await apiFetch('/api/auth/me')
-        const me = await rMe.json().catch(() => ({}))
-        if (rMe.ok && me && me.username) {
-          renderUserBar(me)
-          await loadAvatar()
-        } else {
-          renderUserBar(data.user)
-          await loadAvatar()
-        }
-        hideAuthModal()
-        await loadFavorites()
-        await loadStats()
-      } catch (e) {
-        setAuthMsg('登录失败', false)
-      }
+      })
     })
 
     registerBtn.addEventListener('click', async () => {
-      const invite_code = (inviteCode.value || '').trim()
-      const username = (registerUsername.value || '').trim()
-      const password = registerPassword.value || ''
-      if (!invite_code || !username || !password) { setAuthMsg('请输入邀请码、用户名和密码。', false); return }
-      try {
-        const r = await fetch(API_BASE + '/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ invite_code, username, password }),
-        })
-        const data = await r.json().catch(() => ({}))
-        if (!r.ok || data.status !== 'success') {
-          setAuthMsg((data && data.detail) || '注册失败', false)
-          return
+      await withDisabledFn(registerBtn, async () => {
+        const invite_code = (inviteCode.value || '').trim()
+        if (!invite_code) { setAuthMsg('请输入邀请码。', false); return }
+        const u = validateUsernameFn(registerUsername.value || '')
+        const p = validatePasswordFn(registerPassword.value || '')
+        if (!u.ok) { setAuthMsg(u.reason || '用户名不合法', false); return }
+        if (!p.ok) { setAuthMsg(p.reason || '密码不合法', false); return }
+        try {
+          const r = await fetch(API_BASE + '/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ invite_code, username: u.value, password: p.value }),
+          })
+          const data = await r.json().catch(() => ({}))
+          if (!r.ok || data.status !== 'success') {
+            setAuthMsg((data && data.detail) || '注册失败', false)
+            return
+          }
+          setAuthMsg('注册成功，请登录。', true)
+          setAuthTab(true)
+          loginUsername.value = u.value
+          loginPassword.value = ''
+        } catch (e) {
+          setAuthMsg('注册失败', false)
         }
-        setAuthMsg('注册成功，请登录。', true)
-        setAuthTab(true)
-        loginUsername.value = username
-        loginPassword.value = ''
-      } catch (e) {
-        setAuthMsg('注册失败', false)
-      }
+      })
     })
 
     logoutBtn.addEventListener('click', async () => {
@@ -2739,8 +2768,8 @@
         setProfileMsg('保存失败', false)
       }
     }
-    saveNicknameBtn.addEventListener('click', async () => { await saveNicknameFromInput(nicknameInput) })
-    if (saveNicknameBtnPage) saveNicknameBtnPage.addEventListener('click', async () => { await saveNicknameFromInput(nicknameInputPage) })
+    saveNicknameBtn.addEventListener('click', async () => { await withDisabledFn(saveNicknameBtn, async () => { await saveNicknameFromInput(nicknameInput) }) })
+    if (saveNicknameBtnPage) saveNicknameBtnPage.addEventListener('click', async () => { await withDisabledFn(saveNicknameBtnPage, async () => { await saveNicknameFromInput(nicknameInputPage) }) })
 
     async function uploadAvatarFromInput(fileInputEl) {
       const f = fileInputEl && fileInputEl.files && fileInputEl.files[0]
@@ -2762,21 +2791,22 @@
         setProfileMsg('上传失败', false)
       }
     }
-    uploadAvatarBtn.addEventListener('click', async () => { await uploadAvatarFromInput(avatarFile) })
-    if (uploadAvatarBtnPage) uploadAvatarBtnPage.addEventListener('click', async () => { await uploadAvatarFromInput(avatarFilePage) })
+    uploadAvatarBtn.addEventListener('click', async () => { await withDisabledFn(uploadAvatarBtn, async () => { await uploadAvatarFromInput(avatarFile) }) })
+    if (uploadAvatarBtnPage) uploadAvatarBtnPage.addEventListener('click', async () => { await withDisabledFn(uploadAvatarBtnPage, async () => { await uploadAvatarFromInput(avatarFilePage) }) })
 
     async function changePasswordFromInputs(oldEl, newEl, new2El) {
       const old_password = (oldEl && oldEl.value) || ''
       const new_password = (newEl && newEl.value) || ''
       const new2 = (new2El && new2El.value) || ''
       if (!old_password || !new_password) { setProfileMsg('请输入旧密码与新密码。', false); return }
-      if (new_password.length < 6) { setProfileMsg('新密码至少 6 位。', false); return }
+      const vp = validatePasswordFn(new_password)
+      if (!vp.ok) { setProfileMsg(vp.reason || '新密码不合法', false); return }
       if (new_password !== new2) { setProfileMsg('两次输入的新密码不一致。', false); return }
       try {
         const r = await apiFetch('/api/profile/password', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ old_password, new_password }),
+          body: JSON.stringify({ old_password, new_password: vp.value }),
         })
         const data = await r.json().catch(() => ({}))
         if (!r.ok || data.status !== 'success') {
@@ -2795,32 +2825,34 @@
         setProfileMsg('修改失败', false)
       }
     }
-    changePasswordBtn.addEventListener('click', async () => { await changePasswordFromInputs(oldPasswordInput, newPasswordInput, newPassword2Input) })
-    if (changePasswordBtnPage) changePasswordBtnPage.addEventListener('click', async () => { await changePasswordFromInputs(oldPasswordInputPage, newPasswordInputPage, newPassword2InputPage) })
+    changePasswordBtn.addEventListener('click', async () => { await withDisabledFn(changePasswordBtn, async () => { await changePasswordFromInputs(oldPasswordInput, newPasswordInput, newPassword2Input) }) })
+    if (changePasswordBtnPage) changePasswordBtnPage.addEventListener('click', async () => { await withDisabledFn(changePasswordBtnPage, async () => { await changePasswordFromInputs(oldPasswordInputPage, newPasswordInputPage, newPassword2InputPage) }) })
     clearBtn.addEventListener('click', async () => {
       const base = getApiBase()
       if (!base) return
       {
-        const ok = await confirmDialogFn({ title: '清空知识库？', message: '此操作不可恢复。', confirmText: '清空', tone: 'danger' })
+        const ok = await confirmDialogFn({ title: '清空知识库？', message: '将永久删除知识库中的所有文件，并清空回收站。此操作不可恢复。', confirmText: '清空', tone: 'danger' })
         if (!ok) return
       }
-      try {
-        const r = await apiFetch('/api/clear', { method: 'DELETE' })
-        const data = await r.json().catch(() => ({}))
-        if (r.ok && data.status === 'success') {
-          showStatus('知识库已清空。', true)
-          toastSuccessFn('知识库已清空')
-          uploadQueue = []
-          renderUploadQueue()
-          clearFilters(false)
-          await loadStats()
-          clearSearch()
-          return
+      await withDisabledFn(clearBtn, async () => {
+        try {
+          const r = await apiFetch('/api/clear', { method: 'DELETE' })
+          const data = await r.json().catch(() => ({}))
+          if (r.ok && data.status === 'success') {
+            showStatus('知识库已清空。', true)
+            toastSuccessFn('知识库已清空')
+            uploadQueue = []
+            renderUploadQueue()
+            clearFilters(false)
+            await loadStats()
+            clearSearch()
+            return
+          }
+          showStatus('清空失败: ' + escapeHtml(data.message || String(r.status)), false)
+        } catch (e) {
+          showStatus('清空失败: ' + escapeHtml(e && e.message ? e.message : String(e)), false)
         }
-        showStatus('清空失败: ' + escapeHtml(data.message || String(r.status)), false)
-      } catch (e) {
-        showStatus('清空失败: ' + escapeHtml(e && e.message ? e.message : String(e)), false)
-      }
+      })
     })
 
     loadDailyQuote()
