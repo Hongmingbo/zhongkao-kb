@@ -751,6 +751,7 @@
     const UPLOAD_CONCURRENCY = 3
     let uploadQueue = []
     let activeUploads = 0
+    let uploadPaused = false
     const API_BASE = 'https://hmingbo-zhongkao-kb-api.hf.space'
     const QUOTE_CACHE_KEY = 'ZKKB_DAILY_QUOTE'
     const TOKEN_KEY = 'ZKKB_TOKEN'
@@ -1414,6 +1415,10 @@
       const retryFailedBtn = prog.fail
         ? `<button class="btn btn-soft btn-sm motion-safe" data-action="upload-retry-failed">重试失败</button>`
         : ''
+      const clearFailedBtn = prog.fail
+        ? `<button class="btn btn-soft btn-sm motion-safe" data-action="upload-clear-failed">清空失败</button>`
+        : ''
+      const pauseBtn = `<button class="btn btn-soft btn-sm motion-safe" data-action="upload-toggle-pause">${uploadPaused ? '继续' : '暂停'}</button>`
       const collapseBtn = `<button class="btn btn-soft btn-sm motion-safe" data-action="upload-toggle-collapse">${uploadQueueCollapsed ? '展开明细' : '折叠明细'}</button>`
       const historyBtn = (lastUploadHistory && lastUploadHistory.length)
         ? `<button class="btn btn-soft btn-sm motion-safe" data-action="upload-toggle-history">${showUploadHistory ? '隐藏上次' : '上次记录'}</button>`
@@ -1456,7 +1461,9 @@
                 <span class="chip">等待 ${prog.queued}</span>
               </div>
               <div class="flex items-center gap-2">
+                ${pauseBtn}
                 ${retryFailedBtn}
+                ${clearFailedBtn}
                 ${historyBtn}
                 ${collapseBtn}
                 <button class="btn btn-soft btn-sm motion-safe" data-action="upload-clear-queue">清空队列</button>
@@ -1494,6 +1501,28 @@
         renderUploadQueue()
         pumpQueue()
         toastInfoFn('失败项已重新加入队列')
+        return
+      }
+      if (action === 'upload-toggle-pause') {
+        uploadPaused = !uploadPaused
+        renderUploadQueue()
+        if (uploadPaused) {
+          showStatus('已暂停：不会开始新的上传任务。', true)
+          toastInfoFn('已暂停')
+          return
+        }
+        showStatus('已继续上传。', true)
+        toastInfoFn('已继续')
+        pumpQueue()
+        return
+      }
+      if (action === 'upload-clear-failed') {
+        const ok = await confirmDialogFn({ title: '清空失败项？', message: '将移除所有失败文件，保留等待/上传中/成功项。', confirmText: '清空失败', tone: 'danger' })
+        if (!ok) return
+        if (typeof clearFailedUploads === 'function') uploadQueue = clearFailedUploads(uploadQueue)
+        else uploadQueue = uploadQueue.filter(it => it && it.status !== 'error')
+        renderUploadQueue()
+        toastSuccessFn('失败项已清空')
         return
       }
       if (action === 'upload-clear-queue') {
@@ -1645,6 +1674,7 @@
     }
 
     function pumpQueue() {
+      if (uploadPaused) return
       while (activeUploads < UPLOAD_CONCURRENCY) {
         const next = uploadQueue.find(x => x.status === 'queued')
         if (!next) break

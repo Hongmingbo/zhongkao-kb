@@ -51,6 +51,11 @@
     })
   }
 
+  function clearFailedUploads(queue) {
+    const items = Array.isArray(queue) ? queue : []
+    return items.filter(it => normStatus(it && it.status) !== 'error')
+  }
+
   function makeHighlightKey(category, filename) {
     return String(category || '') + '::' + String(filename || '')
   }
@@ -86,6 +91,7 @@
   global.retryOneUpload = retryOne
   global.retryFailedUploads = retryFailed
   global.clearUploadQueue = clearQueue
+  global.clearFailedUploads = clearFailedUploads
   global.makeHighlightKey = makeHighlightKey
   global.mergeLastUploadSuccess = mergeLastUploadSuccess
   global.snapshotUploadHistory = snapshotUploadHistory
@@ -97,6 +103,7 @@
       retryOne,
       retryFailed,
       clearQueue,
+    clearFailedUploads,
       makeHighlightKey,
       mergeLastUploadSuccess,
       snapshotUploadHistory,
