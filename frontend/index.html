@@ -606,6 +606,7 @@
   <script src="./safety.js"></script>
   <script src="./favorites_view.js"></script>
   <script src="./favorites_tools.js"></script>
+  <script src="./download_internals.js"></script>
   <script src="./mobile_preview.js"></script>
   <script>
     const dropZone = document.getElementById('drop-zone')
@@ -766,6 +767,9 @@
     const validatePasswordFn = typeof validatePassword === 'function' ? validatePassword : (v) => ({ ok: true, value: String(v || '') })
     const validateRenameFn = typeof validateRename === 'function' ? validateRename : (v) => ({ ok: true, value: String(v || '').trim() })
     const withDisabledFn = typeof withDisabled === 'function' ? withDisabled : async (_btn, fn) => await fn()
+    const downloadFileFn = (globalThis && globalThis._downloadInternals && typeof globalThis._downloadInternals.downloadFile === 'function')
+      ? globalThis._downloadInternals.downloadFile
+      : null
     const readJson = (key, fallback) => {
       try {
         const raw = localStorage.getItem(key)
@@ -1237,6 +1241,7 @@
                     : `
                       <button class="btn btn-sm motion-safe text-blue-500 hover:text-blue-700" data-action="preview" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename)}">预览</button>
                       <button class="btn btn-sm motion-safe" style="color: var(--muted);" data-action="copy-name" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename)}">复制文件名</button>
+                      <button class="btn btn-sm motion-safe" style="color: var(--muted);" data-action="download" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename)}">下载</button>
                       <button class="btn btn-sm motion-safe text-red-500 hover:text-red-700" data-action="unfavorite" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename)}">取消收藏</button>
                     `
                   return `
@@ -1800,6 +1805,7 @@
                     <button class="${favCls} text-xs motion-safe star-hover" data-action="favorite" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}" aria-label="收藏">${favIcon}</button>
                       <button class="btn btn-sm motion-safe" style="color: var(--muted);" data-action="copy-name" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">复制文件名</button>
                       <button class="btn btn-sm motion-safe text-blue-500 hover:text-blue-700" data-action="preview" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">预览</button>
+                      <button class="btn btn-sm motion-safe" style="color: var(--muted);" data-action="download" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">下载</button>
                       ${canSplit ? `<button class="btn btn-sm motion-safe text-indigo-500 hover:text-indigo-700" data-action="split" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">拆题</button>` : ''}
                       <button class="btn btn-sm motion-safe" style="color: var(--muted);" data-action="rename" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">重命名</button>
                       <button class="btn btn-sm motion-safe text-red-500 hover:text-red-700" data-action="delete" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">删除</button>
@@ -1937,6 +1943,7 @@
                     <button class="${favCls} text-xs motion-safe star-hover" data-action="favorite" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}" aria-label="收藏">${favIcon}</button>
                     <button class="btn btn-sm motion-safe" style="color: var(--muted);" data-action="copy-name" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">复制文件名</button>
                     <button class="btn btn-sm motion-safe text-blue-500 hover:text-blue-700" data-action="preview" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">预览</button>
+                    <button class="btn btn-sm motion-safe" style="color: var(--muted);" data-action="download" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">下载</button>
                     ${canSplit ? `<button class="btn btn-sm motion-safe text-indigo-500 hover:text-indigo-700" data-action="split" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">拆题</button>` : ''}
                     <button class="btn btn-sm motion-safe text-red-500 hover:text-red-700" data-action="delete" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">删除</button>
                   </div>
@@ -2059,6 +2066,11 @@
       if (!action || !category || !filename) return
       if (action === 'copy-name') { await copyWithToast(filename); return }
       if (action === 'preview') await previewFile(category, filename)
+      if (action === 'download') {
+        if (!downloadFileFn) { toastErrorFn('下载失败', '下载功能未就绪'); return }
+        await downloadFileFn({ category, filename, btn, apiFetch, toastSuccess: toastSuccessFn, toastError: toastErrorFn, withDisabled: withDisabledFn })
+        return
+      }
       if (action === 'favorite') await withDisabledFn(btn, async () => { await toggleFavorite(category, filename) })
       if (action === 'split') await withDisabledFn(btn, async () => { await splitFile(category, filename) })
       if (action === 'rename') await renameFile(category, filename)
@@ -2138,6 +2150,11 @@
         const filename = btn.getAttribute('data-filename')
         if (action === 'copy-name' && filename) { await copyWithToast(filename); return }
         if (action === 'preview' && category && filename) await previewFile(category, filename)
+        if (action === 'download' && category && filename) {
+          if (!downloadFileFn) { toastErrorFn('下载失败', '下载功能未就绪'); return }
+          await downloadFileFn({ category, filename, btn, apiFetch, toastSuccess: toastSuccessFn, toastError: toastErrorFn, withDisabled: withDisabledFn })
+          return
+        }
         if (action === 'favorite' && category && filename) await toggleFavorite(category, filename)
       })
     }
@@ -2153,6 +2170,11 @@
         const filename = btn.getAttribute('data-filename') || ''
         if (action === 'copy-name' && filename) { await copyWithToast(filename); return }
         if (action === 'preview' && category && filename) { await previewFile(category, filename); return }
+        if (action === 'download' && category && filename) {
+          if (!downloadFileFn) { toastErrorFn('下载失败', '下载功能未就绪'); return }
+          await downloadFileFn({ category, filename, btn, apiFetch, toastSuccess: toastSuccessFn, toastError: toastErrorFn, withDisabled: withDisabledFn })
+          return
+        }
         if (action === 'pin-category' && category) {
           favoritesPinnedCategories = (typeof togglePinnedCategory === 'function')
             ? togglePinnedCategory(favoritesPinnedCategories, category)
