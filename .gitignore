@@ -6,3 +6,5 @@ __pycache__/
 .superpowers/
 knowledge_base/**
 !knowledge_base/.gitkeep
+node_modules/
+npm-debug.log*

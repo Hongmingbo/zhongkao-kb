@@ -1,0 +1,13 @@
+{
+  "name": "zhongkao-kb",
+  "private": true,
+  "scripts": {
+    "test:js": "jest",
+    "test": "pytest -q && jest"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  }
+}
+

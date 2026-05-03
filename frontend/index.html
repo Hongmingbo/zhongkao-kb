@@ -92,6 +92,11 @@
     html[data-theme="dark"] .shimmer::after { background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent); }
     @keyframes shimmer { 100% { transform: translateX(100%); } }
     @media (prefers-reduced-motion: reduce) { .shimmer::after { animation: none; } }
+    .toast { pointer-events: auto; border: 1px solid var(--border); background: var(--card); border-radius: .75rem; padding: .75rem; box-shadow: 0 14px 40px rgba(2,8,23,0.10); }
+    html[data-theme="dark"] .toast { box-shadow: 0 18px 48px rgba(0,0,0,0.40); }
+    .toast-bar { width: 3px; border-radius: 999px; }
+    .toast-title { font-weight: 600; color: var(--text); font-size: 14px; }
+    .toast-desc { margin-top: 2px; color: var(--muted); font-size: 13px; }
   </style>
 </head>
 <body class="min-h-screen font-sans">
@@ -515,6 +520,24 @@
     </div>
   </div>
 
+  <div id="toast-stack" class="fixed top-4 right-4 z-[60] space-y-2 w-[340px] max-w-[calc(100vw-2rem)] pointer-events-none" aria-live="polite"></div>
+  <div id="confirm-modal" class="fixed inset-0 z-[70] hidden bg-gray-900 bg-opacity-50 flex items-center justify-center p-4">
+    <div class="bg-card rounded-xl shadow-lg w-full max-w-md card-border">
+      <div class="p-4 card-border border-b flex items-center justify-between">
+        <div id="confirm-title" class="text-lg font-semibold" style="color: var(--text);"></div>
+        <button id="confirm-close" class="btn btn-soft motion-safe" style="padding: 6px 10px;">×</button>
+      </div>
+      <div class="p-4 space-y-4">
+        <div id="confirm-message" class="text-sm muted"></div>
+        <div class="flex justify-end gap-2">
+          <button id="confirm-cancel" class="px-4 py-2 rounded-lg text-sm btn btn-soft motion-safe">取消</button>
+          <button id="confirm-ok" class="px-4 py-2 rounded-lg text-sm btn btn-danger motion-safe">确认</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./feedback.js"></script>
   <script>
     const dropZone = document.getElementById('drop-zone')
     const fileInput = document.getElementById('file-upload')
@@ -650,6 +673,10 @@
     const TOKEN_KEY = 'ZKKB_TOKEN'
     const THEME_KEY = 'ZKKB_THEME'
     let filterActive = false
+    const toastSuccessFn = typeof toastSuccess === 'function' ? toastSuccess : (title, desc) => alert(String(title || '') + (desc ? (': ' + desc) : ''))
+    const toastInfoFn = typeof toastInfo === 'function' ? toastInfo : (title, desc) => alert(String(title || '') + (desc ? (': ' + desc) : ''))
+    const toastErrorFn = typeof toastError === 'function' ? toastError : (title, desc) => alert(String(title || '') + (desc ? (': ' + desc) : ''))
+    const confirmDialogFn = typeof confirmDialog === 'function' ? confirmDialog : async (opts) => confirm(String((opts && (opts.message || opts.title)) || '请确认'))
 
     function getToken() { return localStorage.getItem(TOKEN_KEY) || '' }
     function setToken(t) { localStorage.setItem(TOKEN_KEY, t) }
@@ -946,6 +973,7 @@
     }
 
     async function toggleFavorite(category, filename) {
+      let favorited = false
       try {
         const r = await apiFetch('/api/favorites/toggle', {
           method: 'POST',
@@ -954,17 +982,18 @@
         })
         const data = await r.json().catch(() => ({}))
         if (!r.ok || (data && data.status) !== 'success') {
-          alert((data && data.detail) || '操作失败')
+          toastErrorFn('操作失败', (data && data.detail) || '')
           return
         }
-        const favorited = !!data.favorited
+        favorited = !!data.favorited
         const k = favoriteKey(category, filename)
         if (favorited) favorites.add(k)
         else favorites.delete(k)
       } catch (e) {
-        alert('操作失败')
+        toastErrorFn('操作失败', e && e.message ? e.message : '')
         return
       }
+      toastInfoFn(favorited ? '已收藏' : '已取消收藏')
 
       const tab = parseTabFromHash()
       if (tab === 'search') {
@@ -1235,44 +1264,49 @@
         })
         const data = await r.json().catch(() => ({}))
         if (!r.ok || data.status !== 'success') {
-          alert((data && data.detail) || '恢复失败')
+          toastErrorFn('恢复失败', (data && data.detail) || '')
           return
         }
+        toastSuccessFn('已恢复')
         await loadTrash()
         if (filterActive) await applyFilters()
         else await loadStats()
       } catch (e) {
-        alert('恢复失败')
+        toastErrorFn('恢复失败', e && e.message ? e.message : '')
       }
     }
 
     async function deleteTrash(id) {
-      if (!confirm('确定要彻底删除该文件吗？此操作不可恢复。')) return
+      const ok = await confirmDialogFn({ title: '彻底删除文件？', message: '此操作不可恢复。', confirmText: '删除', tone: 'danger' })
+      if (!ok) return
       try {
         const r = await apiFetch('/api/trash/' + encodeURIComponent(id), { method: 'DELETE' })
         const data = await r.json().catch(() => ({}))
         if (!r.ok || data.status !== 'success') {
-          alert((data && data.detail) || '删除失败')
+          toastErrorFn('删除失败', (data && data.detail) || '')
           return
         }
+        toastSuccessFn('已删除')
         await loadTrash()
       } catch (e) {
-        alert('删除失败')
+        toastErrorFn('删除失败', e && e.message ? e.message : '')
       }
     }
 
     async function clearTrashAll() {
-      if (!confirm('确定要清空回收站吗？此操作不可恢复。')) return
+      const ok = await confirmDialogFn({ title: '清空回收站？', message: '此操作不可恢复。', confirmText: '清空', tone: 'danger' })
+      if (!ok) return
       try {
         const r = await apiFetch('/api/trash/clear', { method: 'DELETE' })
         const data = await r.json().catch(() => ({}))
         if (!r.ok || data.status !== 'success') {
-          alert((data && data.detail) || '清空失败')
+          toastErrorFn('清空失败', (data && data.detail) || '')
           return
         }
+        toastSuccessFn('已清空')
         await loadTrash()
       } catch (e) {
-        alert('清空失败')
+        toastErrorFn('清空失败', e && e.message ? e.message : '')
       }
     }
 
@@ -1765,7 +1799,7 @@
         const response = await apiFetch(url)
         const data = await response.json()
         if (!response.ok) {
-          alert('预览失败: ' + (data && data.detail ? data.detail : String(response.status)))
+          toastErrorFn('预览失败', (data && data.detail) ? String(data.detail) : String(response.status))
           return
         }
         if (isDesktopPreview()) {
@@ -1785,7 +1819,7 @@
         renderPreviewTo(modalContent, base, category, filename, data)
         previewModal.classList.remove('hidden')
       } catch (e) {
-        alert('预览失败: ' + (e && e.message ? e.message : String(e)))
+        toastErrorFn('预览失败', e && e.message ? e.message : String(e))
       }
     }
 
@@ -1799,7 +1833,7 @@
         })
         const data = await r.json().catch(() => ({}))
         if (!r.ok || data.status !== 'success') {
-          alert('拆题失败: ' + escapeHtml((data && (data.detail || data.message)) || String(r.status)))
+          toastErrorFn('拆题失败', escapeHtml((data && (data.detail || data.message)) || String(r.status)))
           return
         }
 
@@ -1813,7 +1847,7 @@
         const r2 = await apiFetch(qUrl)
         const qData = await r2.json().catch(() => ({}))
         if (!r2.ok) {
-          alert('获取拆题结果失败: ' + escapeHtml((qData && qData.detail) || String(r2.status)))
+          toastErrorFn('获取拆题结果失败', escapeHtml((qData && qData.detail) || String(r2.status)))
           return
         }
 
@@ -1844,7 +1878,7 @@
         `
         previewModal.classList.remove('hidden')
       } catch (e) {
-        alert('拆题失败: ' + (e && e.message ? e.message : String(e)))
+        toastErrorFn('拆题失败', e && e.message ? e.message : String(e))
       }
     }
 
@@ -1926,7 +1960,8 @@
         brMsg.className = 'text-sm text-amber-700'
         return
       }
-      if (!confirm(`确定重命名 ${items.length} 个文件吗？`)) return
+      const ok = await confirmDialogFn({ title: '批量重命名？', message: `确定重命名 ${items.length} 个文件吗？`, confirmText: '重命名', tone: 'primary' })
+      if (!ok) return
       try {
         const r = await apiFetch('/api/file/batch_rename', {
           method: 'POST',
@@ -1944,6 +1979,7 @@
         const failCount = results.length - okCount
         brMsg.textContent = `重命名完成：成功 ${okCount}，失败 ${failCount}`
         brMsg.className = failCount ? 'text-sm text-amber-700' : 'text-sm text-green-700'
+        toastInfoFn('批量重命名完成', `成功 ${okCount}，失败 ${failCount}`)
 
         results.forEach(x => {
           if (!x || !x.ok) return
@@ -1961,25 +1997,27 @@
       } catch (e) {
         brMsg.textContent = '批量重命名失败'
         brMsg.className = 'text-sm text-red-700'
+        toastErrorFn('批量重命名失败', e && e.message ? e.message : '')
       }
     }
 
     async function deleteFile(category, filename) {
       const base = getApiBase()
-      if (!confirm(`确定要删除文件 "${filename}" 吗？`)) return
+      const ok = await confirmDialogFn({ title: '移入回收站？', message: `确定要删除文件 "${filename}" 吗？`, confirmText: '删除', tone: 'danger' })
+      if (!ok) return
       try {
         const url = '/api/file/' + encodeURIComponent(category) + '/' + encodeURIComponent(filename)
         const response = await apiFetch(url, { method: 'DELETE' })
         const data = await response.json().catch(() => ({}))
         if (response.ok && data.status === 'success') {
-          alert(data.message || '已移入回收站')
+          toastSuccessFn('已移入回收站', data.message || '')
           if (filterActive) await applyFilters()
           else await loadStats()
           return
         }
-        alert('删除失败: ' + (data.message || String(response.status)))
+        toastErrorFn('删除失败', (data && data.message) ? String(data.message) : String(response.status))
       } catch (e) {
-        alert('删除失败: ' + (e && e.message ? e.message : String(e)))
+        toastErrorFn('删除失败', e && e.message ? e.message : String(e))
       }
     }
 
@@ -2039,7 +2077,10 @@
     bulkCancelBtn.addEventListener('click', () => { selectedKb.clear(); updateBulkBar(); void loadStats() })
     bulkTrashBtn.addEventListener('click', async () => {
       if (!selectedKb.size) return
-      if (!confirm(`确定将已选择的 ${selectedKb.size} 个文件移入回收站吗？`)) return
+      {
+        const ok = await confirmDialogFn({ title: '批量移入回收站？', message: `确定将已选择的 ${selectedKb.size} 个文件移入回收站吗？`, confirmText: '移入', tone: 'danger' })
+        if (!ok) return
+      }
       const items = Array.from(selectedKb).map(k => {
         const parts = k.split('::')
         return { category: parts[0] || '', filename: parts.slice(1).join('::') || '' }
@@ -2052,26 +2093,29 @@
         })
         const data = await r.json().catch(() => ({}))
         if (!r.ok || data.status !== 'success') {
-          alert((data && data.detail) || '批量操作失败')
+          toastErrorFn('批量操作失败', (data && data.detail) || '')
           return
         }
         const results = Array.isArray(data.results) ? data.results : []
         const okCount = results.filter(x => x && x.ok).length
         const failCount = results.length - okCount
-        alert(`已移入回收站：${okCount}，失败：${failCount}`)
+        toastInfoFn('已移入回收站', `成功 ${okCount}，失败 ${failCount}`)
         selectedKb.clear()
         updateBulkBar()
         if (filterActive) await applyFilters()
         else await loadStats()
       } catch (e) {
-        alert('批量操作失败')
+        toastErrorFn('批量操作失败', e && e.message ? e.message : '')
       }
     })
     bulkMoveBtn.addEventListener('click', async () => {
       if (!selectedKb.size) return
       const target_category = (bulkTargetCategorySelect.value || '').trim()
-      if (!target_category) { alert('请选择目标学科'); return }
-      if (!confirm(`确定将已选择的 ${selectedKb.size} 个文件移动到 "${target_category}" 吗？`)) return
+      if (!target_category) { toastInfoFn('请选择目标学科'); return }
+      {
+        const ok = await confirmDialogFn({ title: '批量移动文件？', message: `确定将已选择的 ${selectedKb.size} 个文件移动到 "${target_category}" 吗？`, confirmText: '移动', tone: 'primary' })
+        if (!ok) return
+      }
       const items = Array.from(selectedKb).map(k => {
         const parts = k.split('::')
         return { category: parts[0] || '', filename: parts.slice(1).join('::') || '' }
@@ -2084,19 +2128,19 @@
         })
         const data = await r.json().catch(() => ({}))
         if (!r.ok || data.status !== 'success') {
-          alert((data && data.detail) || '批量移动失败')
+          toastErrorFn('批量移动失败', (data && data.detail) || '')
           return
         }
         const results = Array.isArray(data.results) ? data.results : []
         const okCount = results.filter(x => x && x.ok).length
         const failCount = results.length - okCount
-        alert(`已移动：${okCount}，失败：${failCount}`)
+        toastInfoFn('已移动', `成功 ${okCount}，失败 ${failCount}`)
         selectedKb.clear()
         updateBulkBar()
         if (filterActive) await applyFilters()
         else await loadStats()
       } catch (e) {
-        alert('批量移动失败')
+        toastErrorFn('批量移动失败', e && e.message ? e.message : '')
       }
     })
     bulkMetaBtn.addEventListener('click', () => {
@@ -2121,19 +2165,19 @@
         })
         const data = await r.json().catch(() => ({}))
         if (!r.ok || data.status !== 'success') {
-          alert((data && data.detail) || '批量恢复失败')
+          toastErrorFn('批量恢复失败', (data && data.detail) || '')
           return
         }
         const results = Array.isArray(data.results) ? data.results : []
         const okCount = results.filter(x => x && x.ok).length
         const failCount = results.length - okCount
-        alert(`已恢复：${okCount}，失败：${failCount}`)
+        toastInfoFn('已恢复', `成功 ${okCount}，失败 ${failCount}`)
         selectedTrash.clear()
         await loadTrash()
         if (filterActive) await applyFilters()
         else await loadStats()
       } catch (e) {
-        alert('批量恢复失败')
+        toastErrorFn('批量恢复失败', e && e.message ? e.message : '')
       }
     })
     if (trashRestoreSelectedBtnPage) trashRestoreSelectedBtnPage.addEventListener('click', async () => { await (async () => {
@@ -2147,20 +2191,24 @@
         })
         const data = await r.json().catch(() => ({}))
         if (!r.ok || data.status !== 'success') {
-          alert((data && data.detail) || '批量操作失败')
+          toastErrorFn('批量操作失败', (data && data.detail) || '')
           return
         }
         selectedTrash.clear()
+        toastSuccessFn('已恢复')
         await loadTrash()
         if (filterActive) await applyFilters()
         else await loadStats()
       } catch (e) {
-        alert('批量操作失败')
+        toastErrorFn('批量操作失败', e && e.message ? e.message : '')
       }
     })() })
     trashPurgeSelectedBtn.addEventListener('click', async () => {
       if (!selectedTrash.size) return
-      if (!confirm('确定彻底删除已选文件吗？此操作不可恢复。')) return
+      {
+        const ok = await confirmDialogFn({ title: '彻底删除已选文件？', message: '此操作不可恢复。', confirmText: '删除', tone: 'danger' })
+        if (!ok) return
+      }
       const ids = Array.from(selectedTrash)
       try {
         const r = await apiFetch('/api/trash/batch_purge', {
@@ -2170,22 +2218,25 @@
         })
         const data = await r.json().catch(() => ({}))
         if (!r.ok || data.status !== 'success') {
-          alert((data && data.detail) || '批量删除失败')
+          toastErrorFn('批量删除失败', (data && data.detail) || '')
           return
         }
         const results = Array.isArray(data.results) ? data.results : []
         const okCount = results.filter(x => x && x.ok).length
         const failCount = results.length - okCount
-        alert(`已删除：${okCount}，失败：${failCount}`)
+        toastInfoFn('已删除', `成功 ${okCount}，失败 ${failCount}`)
         selectedTrash.clear()
         await loadTrash()
       } catch (e) {
-        alert('批量删除失败')
+        toastErrorFn('批量删除失败', e && e.message ? e.message : '')
       }
     })
     if (trashPurgeSelectedBtnPage) trashPurgeSelectedBtnPage.addEventListener('click', async () => { await (async () => {
       if (!selectedTrash.size) return
-      if (!confirm(`确定彻底删除已选择的 ${selectedTrash.size} 个文件吗？此操作不可恢复。`)) return
+      {
+        const ok = await confirmDialogFn({ title: '彻底删除已选文件？', message: `确定彻底删除已选择的 ${selectedTrash.size} 个文件吗？此操作不可恢复。`, confirmText: '删除', tone: 'danger' })
+        if (!ok) return
+      }
       const items = Array.from(selectedTrash).slice(0, 500).map(id => ({ id }))
       try {
         const r = await apiFetch('/api/trash/batch_purge', {
@@ -2195,13 +2246,14 @@
         })
         const data = await r.json().catch(() => ({}))
         if (!r.ok || data.status !== 'success') {
-          alert((data && data.detail) || '批量操作失败')
+          toastErrorFn('批量操作失败', (data && data.detail) || '')
           return
         }
         selectedTrash.clear()
+        toastSuccessFn('已删除')
         await loadTrash()
       } catch (e) {
-        alert('批量操作失败')
+        toastErrorFn('批量操作失败', e && e.message ? e.message : '')
       }
     })() })
     closeMetaBtn.addEventListener('click', hideMetaModal)
@@ -2436,12 +2488,16 @@
     clearBtn.addEventListener('click', async () => {
       const base = getApiBase()
       if (!base) return
-      if (!confirm('确定要清空知识库吗？')) return
+      {
+        const ok = await confirmDialogFn({ title: '清空知识库？', message: '此操作不可恢复。', confirmText: '清空', tone: 'danger' })
+        if (!ok) return
+      }
       try {
         const r = await apiFetch('/api/clear', { method: 'DELETE' })
         const data = await r.json().catch(() => ({}))
         if (r.ok && data.status === 'success') {
           showStatus('知识库已清空。', true)
+          toastSuccessFn('知识库已清空')
           uploadQueue = []
           renderUploadQueue()
           clearFilters(false)
