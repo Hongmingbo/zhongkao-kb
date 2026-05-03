@@ -97,6 +97,14 @@
     .toast-bar { width: 3px; border-radius: 999px; }
     .toast-title { font-weight: 600; color: var(--text); font-size: 14px; }
     .toast-desc { margin-top: 2px; color: var(--muted); font-size: 13px; }
+    .sheet { position: fixed; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--border); border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-top-left-radius: 16px; border-top-right-radius: 16px; box-shadow: 0 -18px 48px rgba(2,8,23,0.14); overflow: hidden; }
+    html[data-theme="dark"] .sheet { box-shadow: 0 -22px 56px rgba(0,0,0,0.55); }
+    .sheet-half { height: 55vh; }
+    .sheet-full { height: 90vh; }
+    .sheet-body { flex: 1; overflow: auto; }
+    @media (prefers-reduced-motion: no-preference) {
+      .sheet { transition: height .16s ease; }
+    }
   </style>
 </head>
 <body class="min-h-screen font-sans">
@@ -521,6 +529,20 @@
   </div>
 
   <div id="toast-stack" class="fixed top-4 right-4 z-[60] space-y-2 w-[340px] max-w-[calc(100vw-2rem)] pointer-events-none" aria-live="polite"></div>
+  <div id="mobile-preview-overlay" class="fixed inset-0 z-[65] hidden bg-gray-900 bg-opacity-40"></div>
+  <div id="mobile-preview-sheet" class="sheet sheet-half z-[66] hidden">
+    <div class="px-4 py-3 card-border border-b flex items-center justify-between gap-2">
+      <div class="min-w-0 flex items-center gap-2">
+        <div id="mobile-preview-title" class="text-sm font-semibold truncate" style="color: var(--text);">预览</div>
+        <span id="mobile-preview-badge" class="chip">—</span>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <button id="mobile-preview-toggle" class="px-2 py-1 rounded-lg text-xs btn btn-soft motion-safe">展开</button>
+        <button id="mobile-preview-close" class="px-2 py-1 rounded-lg text-xs btn btn-soft motion-safe">关闭</button>
+      </div>
+    </div>
+    <div id="mobile-preview-body" class="p-4 sheet-body"></div>
+  </div>
   <div id="confirm-modal" class="fixed inset-0 z-[70] hidden bg-gray-900 bg-opacity-50 flex items-center justify-center p-4">
     <div class="bg-card rounded-xl shadow-lg w-full max-w-md card-border">
       <div class="p-4 card-border border-b flex items-center justify-between">
@@ -540,6 +562,7 @@
   <script src="./feedback.js"></script>
   <script src="./upload_queue.js"></script>
   <script src="./usability.js"></script>
+  <script src="./mobile_preview.js"></script>
   <script>
     const dropZone = document.getElementById('drop-zone')
     const fileInput = document.getElementById('file-upload')
@@ -1928,7 +1951,15 @@
             return
           }
         }
-        modalTitle.textContent = data.filename || filename
+        const shownName = data.filename || filename
+        const info = previewBadgeInfo(shownName)
+        if (typeof openMobilePreviewSheet === 'function') {
+          openMobilePreviewSheet({ title: shownName, badgeText: info.text, badgeCls: info.cls, html: '' })
+          const bodyEl = document.getElementById('mobile-preview-body')
+          if (bodyEl) renderPreviewTo(bodyEl, base, category, filename, data)
+          return
+        }
+        modalTitle.textContent = shownName
         renderPreviewTo(modalContent, base, category, filename, data)
         previewModal.classList.remove('hidden')
       } catch (e) {
@@ -2177,6 +2208,24 @@
     }
     if (searchPreviewBody) {
       searchPreviewBody.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button')
+        if (!btn) return
+        const action = btn.getAttribute('data-action') || ''
+        if (action === 'copy-link') {
+          const url = btn.getAttribute('data-url') || ''
+          if (url) await copyWithToast(url)
+          return
+        }
+        if (action !== 'preview-derived') return
+        const category = btn.getAttribute('data-category') || ''
+        const filename = btn.getAttribute('data-filename') || ''
+        if (!category || !filename) return
+        await previewFile(category, filename)
+      })
+    }
+    const mobilePreviewBody = document.getElementById('mobile-preview-body')
+    if (mobilePreviewBody) {
+      mobilePreviewBody.addEventListener('click', async (e) => {
         const btn = e.target.closest('button')
         if (!btn) return
         const action = btn.getAttribute('data-action') || ''
