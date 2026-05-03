@@ -539,6 +539,7 @@
 
   <script src="./feedback.js"></script>
   <script src="./upload_queue.js"></script>
+  <script src="./usability.js"></script>
   <script>
     const dropZone = document.getElementById('drop-zone')
     const fileInput = document.getElementById('file-upload')
@@ -678,10 +679,18 @@
     const toastInfoFn = typeof toastInfo === 'function' ? toastInfo : (title, desc) => alert(String(title || '') + (desc ? (': ' + desc) : ''))
     const toastErrorFn = typeof toastError === 'function' ? toastError : (title, desc) => alert(String(title || '') + (desc ? (': ' + desc) : ''))
     const confirmDialogFn = typeof confirmDialog === 'function' ? confirmDialog : async (opts) => confirm(String((opts && (opts.message || opts.title)) || '请确认'))
+    const copyTextFn = typeof copyText === 'function' ? copyText : async () => false
+    const installGlobalShortcutsFn = typeof installGlobalShortcuts === 'function' ? installGlobalShortcuts : null
 
     function getToken() { return localStorage.getItem(TOKEN_KEY) || '' }
     function setToken(t) { localStorage.setItem(TOKEN_KEY, t) }
     function clearToken() { localStorage.removeItem(TOKEN_KEY); favorites.clear() }
+
+    async function copyWithToast(text) {
+      const ok = await copyTextFn(String(text || ''))
+      if (ok) toastSuccessFn('已复制')
+      else toastErrorFn('复制失败')
+    }
 
     function getThemePreference() {
       try { return localStorage.getItem(THEME_KEY) || '' } catch (e) { return '' }
@@ -1320,6 +1329,7 @@
                 </div>
                 <div class="flex gap-2 shrink-0">
               <button class="px-3 py-1.5 rounded-lg text-xs btn btn-primary motion-safe" data-action="trash-restore" data-id="${escapeAttr(it.id || '')}">恢复</button>
+              <button class="px-3 py-1.5 rounded-lg text-xs btn btn-soft motion-safe" data-action="copy-name" data-filename="${escapeAttr(it.filename || '')}">复制文件名</button>
               <button class="px-3 py-1.5 rounded-lg text-xs btn btn-soft motion-safe" data-action="trash-delete" data-id="${escapeAttr(it.id || '')}">彻底删除</button>
                 </div>
               </div>
@@ -1437,7 +1447,8 @@
                       ${f.has_meta ? '<span class="ml-2 chip chip-accent">已提取标签</span>' : ''}
                     </div>
                     <div class="hidden group-hover:flex space-x-2">
-                      <button class="${favCls} text-xs motion-safe star-hover" data-action="favorite" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}" aria-label="收藏">${favIcon}</button>
+                    <button class="${favCls} text-xs motion-safe star-hover" data-action="favorite" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}" aria-label="收藏">${favIcon}</button>
+                    <button class="text-xs" style="color: var(--muted);" data-action="copy-name" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">复制文件名</button>
                       <button class="text-blue-500 hover:text-blue-700 text-xs" data-action="preview" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">预览</button>
                       ${canSplit ? `<button class="text-indigo-500 hover:text-indigo-700 text-xs" data-action="split" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">拆题</button>` : ''}
                       <button class="text-xs" style="color: var(--muted);" data-action="rename" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">重命名</button>
@@ -1573,6 +1584,7 @@
                   </div>
                   <div class="hidden group-hover:flex space-x-2">
                     <button class="${favCls} text-xs motion-safe star-hover" data-action="favorite" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}" aria-label="收藏">${favIcon}</button>
+                    <button class="text-xs" style="color: var(--muted);" data-action="copy-name" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">复制文件名</button>
                     <button class="text-blue-500 hover:text-blue-700 text-xs" data-action="preview" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">预览</button>
                     ${canSplit ? `<button class="text-indigo-500 hover:text-indigo-700 text-xs" data-action="split" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">拆题</button>` : ''}
                     <button class="text-red-500 hover:text-red-700 text-xs" data-action="delete" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">删除</button>
@@ -1676,6 +1688,7 @@
               </div>
               <div class="flex items-center gap-2">
                 <button class="${favCls} text-xs motion-safe star-hover" data-action="favorite" data-category="${escapeAttr(r.category || '')}" data-filename="${escapeAttr(r.filename || '')}" aria-label="收藏">${favIcon}</button>
+                <button class="text-xs" style="color: var(--muted);" data-action="copy-name" data-category="${escapeAttr(r.category || '')}" data-filename="${escapeAttr(r.filename || '')}">复制文件名</button>
                 <button class="text-xs" style="color: var(--primary);" data-action="preview" data-category="${escapeAttr(r.category || '')}" data-filename="${escapeAttr(r.filename || '')}">预览</button>
               </div>
             </div>
@@ -1693,6 +1706,7 @@
       const category = btn.getAttribute('data-category')
       const filename = btn.getAttribute('data-filename')
       if (!action || !category || !filename) return
+      if (action === 'copy-name') { await copyWithToast(filename); return }
       if (action === 'preview') await previewFile(category, filename)
       if (action === 'favorite') await toggleFavorite(category, filename)
       if (action === 'split') await splitFile(category, filename)
@@ -1714,8 +1728,14 @@
       const btn = e.target.closest('button')
       if (!btn) return
       const action = btn.getAttribute('data-action')
+      if (!action) return
+      if (action === 'copy-name') {
+        const filename = btn.getAttribute('data-filename') || ''
+        if (filename) await copyWithToast(filename)
+        return
+      }
       const id = btn.getAttribute('data-id')
-      if (!action || !id) return
+      if (!id) return
       if (action === 'trash-restore') await restoreTrash(id)
       if (action === 'trash-delete') await deleteTrash(id)
     })
@@ -1735,8 +1755,14 @@
         const btn = e.target.closest('button')
         if (!btn) return
         const action = btn.getAttribute('data-action')
+        if (!action) return
+        if (action === 'copy-name') {
+          const filename = btn.getAttribute('data-filename') || ''
+          if (filename) await copyWithToast(filename)
+          return
+        }
         const id = btn.getAttribute('data-id')
-        if (!action || !id) return
+        if (!id) return
         if (action === 'trash-restore') await restoreTrash(id)
         if (action === 'trash-delete') await deleteTrash(id)
       })
@@ -1759,6 +1785,7 @@
         const action = btn.getAttribute('data-action')
         const category = btn.getAttribute('data-category')
         const filename = btn.getAttribute('data-filename')
+        if (action === 'copy-name' && filename) { await copyWithToast(filename); return }
         if (action === 'preview' && category && filename) await previewFile(category, filename)
         if (action === 'favorite' && category && filename) await toggleFavorite(category, filename)
       })
@@ -1833,7 +1860,12 @@
 
       const ext = (data.ext || '').toLowerCase()
       const rawUrl = data.raw_url ? (base + data.raw_url) : ''
-      const download = rawUrl ? `<a class="text-sm" style="color: var(--primary);" href="${escapeAttr(rawUrl)}" target="_blank" rel="noopener">下载/打开原文件</a>` : ''
+      const download = rawUrl ? `
+        <div class="flex items-center gap-2 flex-wrap">
+          <a class="text-sm" style="color: var(--primary);" href="${escapeAttr(rawUrl)}" target="_blank" rel="noopener">下载/打开原文件</a>
+          <button class="text-xs btn btn-soft motion-safe px-2 py-1 rounded-lg" data-action="copy-link" data-url="${escapeAttr(rawUrl)}">复制链接</button>
+        </div>
+      ` : ''
       if (rawUrl && ['.png', '.jpg', '.jpeg', '.webp'].includes(ext)) {
         el.innerHTML = `
           <div class="space-y-3">
@@ -2107,7 +2139,13 @@
     modalContent.addEventListener('click', async (e) => {
       const btn = e.target.closest('button')
       if (!btn) return
-      if (btn.getAttribute('data-action') !== 'preview-derived') return
+      const action = btn.getAttribute('data-action') || ''
+      if (action === 'copy-link') {
+        const url = btn.getAttribute('data-url') || ''
+        if (url) await copyWithToast(url)
+        return
+      }
+      if (action !== 'preview-derived') return
       const category = btn.getAttribute('data-category') || ''
       const filename = btn.getAttribute('data-filename') || ''
       if (!category || !filename) return
@@ -2117,7 +2155,13 @@
       libraryPreviewBody.addEventListener('click', async (e) => {
         const btn = e.target.closest('button')
         if (!btn) return
-        if (btn.getAttribute('data-action') !== 'preview-derived') return
+        const action = btn.getAttribute('data-action') || ''
+        if (action === 'copy-link') {
+          const url = btn.getAttribute('data-url') || ''
+          if (url) await copyWithToast(url)
+          return
+        }
+        if (action !== 'preview-derived') return
         const category = btn.getAttribute('data-category') || ''
         const filename = btn.getAttribute('data-filename') || ''
         if (!category || !filename) return
@@ -2135,7 +2179,13 @@
       searchPreviewBody.addEventListener('click', async (e) => {
         const btn = e.target.closest('button')
         if (!btn) return
-        if (btn.getAttribute('data-action') !== 'preview-derived') return
+        const action = btn.getAttribute('data-action') || ''
+        if (action === 'copy-link') {
+          const url = btn.getAttribute('data-url') || ''
+          if (url) await copyWithToast(url)
+          return
+        }
+        if (action !== 'preview-derived') return
         const category = btn.getAttribute('data-category') || ''
         const filename = btn.getAttribute('data-filename') || ''
         if (!category || !filename) return
@@ -2601,6 +2651,15 @@
         })
       }
     } catch (e) {}
+
+    if (installGlobalShortcutsFn) {
+      installGlobalShortcutsFn({
+        setActiveTab,
+        searchQueryInput,
+        previewModal,
+        confirmModal: document.getElementById('confirm-modal'),
+      })
+    }
 
     document.querySelectorAll('[data-tab]').forEach(btn => {
       btn.addEventListener('click', () => {
