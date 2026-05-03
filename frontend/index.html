@@ -105,6 +105,8 @@
     @media (prefers-reduced-motion: no-preference) {
       .sheet { transition: height .16s ease; }
     }
+    .kb-highlight { background: rgba(6,182,212,0.12); border: 1px solid rgba(6,182,212,0.45); border-radius: .75rem; padding-left: .25rem; padding-right: .25rem; }
+    html[data-theme="dark"] .kb-highlight { background: rgba(34,211,238,0.12); border-color: rgba(34,211,238,0.35); }
   </style>
 </head>
 <body class="min-h-screen font-sans">
@@ -697,6 +699,9 @@
     const QUOTE_CACHE_KEY = 'ZKKB_DAILY_QUOTE'
     const TOKEN_KEY = 'ZKKB_TOKEN'
     const THEME_KEY = 'ZKKB_THEME'
+    const LAST_UPLOAD_SUCCESS_KEY = 'ZKKB_LAST_UPLOAD_SUCCESS'
+    const LAST_UPLOAD_HISTORY_KEY = 'ZKKB_LAST_UPLOAD_HISTORY'
+    const UPLOAD_QUEUE_COLLAPSED_KEY = 'ZKKB_UPLOAD_QUEUE_COLLAPSED'
     let filterActive = false
     const toastSuccessFn = typeof toastSuccess === 'function' ? toastSuccess : (title, desc) => alert(String(title || '') + (desc ? (': ' + desc) : ''))
     const toastInfoFn = typeof toastInfo === 'function' ? toastInfo : (title, desc) => alert(String(title || '') + (desc ? (': ' + desc) : ''))
@@ -704,6 +709,21 @@
     const confirmDialogFn = typeof confirmDialog === 'function' ? confirmDialog : async (opts) => confirm(String((opts && (opts.message || opts.title)) || '请确认'))
     const copyTextFn = typeof copyText === 'function' ? copyText : async () => false
     const installGlobalShortcutsFn = typeof installGlobalShortcuts === 'function' ? installGlobalShortcuts : null
+    const readJson = (key, fallback) => {
+      try {
+        const raw = localStorage.getItem(key)
+        return raw ? JSON.parse(raw) : fallback
+      } catch (e) {
+        return fallback
+      }
+    }
+    const writeJson = (key, value) => {
+      try { localStorage.setItem(key, JSON.stringify(value)) } catch (e) {}
+    }
+    let lastUploadSuccess = readJson(LAST_UPLOAD_SUCCESS_KEY, [])
+    let lastUploadHistory = readJson(LAST_UPLOAD_HISTORY_KEY, [])
+    let uploadQueueCollapsed = (() => { try { return localStorage.getItem(UPLOAD_QUEUE_COLLAPSED_KEY) === '1' } catch (e) { return false } })()
+    let showUploadHistory = false
 
     function getToken() { return localStorage.getItem(TOKEN_KEY) || '' }
     function setToken(t) { localStorage.setItem(TOKEN_KEY, t) }
@@ -1111,7 +1131,7 @@
     }
 
     function renderUploadQueue() {
-      if (!uploadQueue.length) {
+      if (!uploadQueue.length && !(lastUploadHistory && lastUploadHistory.length)) {
         uploadQueueEl.classList.add('hidden')
         uploadQueueEl.innerHTML = ''
         return
@@ -1165,6 +1185,34 @@
       const retryFailedBtn = prog.fail
         ? `<button class="px-2 py-1 rounded-lg text-xs btn btn-soft motion-safe" data-action="upload-retry-failed">重试失败</button>`
         : ''
+      const collapseBtn = `<button class="px-2 py-1 rounded-lg text-xs btn btn-soft motion-safe" data-action="upload-toggle-collapse">${uploadQueueCollapsed ? '展开明细' : '折叠明细'}</button>`
+      const historyBtn = (lastUploadHistory && lastUploadHistory.length)
+        ? `<button class="px-2 py-1 rounded-lg text-xs btn btn-soft motion-safe" data-action="upload-toggle-history">${showUploadHistory ? '隐藏上次' : '上次记录'}</button>`
+        : ''
+      const clearHistoryBtn = (showUploadHistory && lastUploadHistory && lastUploadHistory.length)
+        ? `<button class="px-2 py-1 rounded-lg text-xs btn btn-soft motion-safe" data-action="upload-clear-history">清空历史</button>`
+        : ''
+
+      const historyPanel = (showUploadHistory && lastUploadHistory && lastUploadHistory.length)
+        ? `
+          <div class="px-3 py-3 card-border border-t">
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <div class="text-sm font-medium" style="color: var(--text);">上次上传记录</div>
+              <div class="flex items-center gap-2">${clearHistoryBtn}</div>
+            </div>
+            <div class="space-y-2">
+              ${lastUploadHistory.slice(0, 30).map(it => {
+                const st = String(it && it.status || '')
+                const b = st === 'success' ? '<span class="chip chip-warning">成功</span>' : (st === 'error' ? '<span class="chip chip-danger">失败</span>' : (st === 'uploading' ? '<span class="chip chip-accent">上传中</span>' : '<span class="chip">等待</span>'))
+                const msg = st === 'error' && it.message ? `<div class="text-xs text-red-600 mt-1 break-words">${escapeHtml(it.message)}</div>` : ''
+                const cat = it.category ? `<span class="chip chip-warning ml-2">${escapeHtml(it.category)}</span>` : ''
+                return `<div class="p-2 rounded-lg card-border bg-card"><div class="flex items-start justify-between gap-2"><div class="min-w-0"><div class="text-sm truncate" style="color: var(--text);" title="${escapeAttr(it.name || '')}">${escapeHtml(it.name || '')}</div>${msg}</div><div class="shrink-0">${b}${cat}</div></div></div>`
+              }).join('')}
+            </div>
+            <div class="mt-2 text-xs muted">提示：刷新页面后无法直接重传原文件，如需重试请重新选择文件上传。</div>
+          </div>
+        `
+        : ''
 
       uploadQueueEl.innerHTML = `
         <div class="rounded-lg card-border bg-card">
@@ -1174,9 +1222,14 @@
                 <div class="text-sm font-medium truncate" style="color: var(--text);">批量上传队列</div>
                 <span class="chip">已完成 ${prog.done} / ${prog.total}</span>
                 ${failChip}
+                <span class="chip">成功 ${prog.success}</span>
+                <span class="chip chip-accent">上传中 ${prog.uploading}</span>
+                <span class="chip">等待 ${prog.queued}</span>
               </div>
               <div class="flex items-center gap-2">
                 ${retryFailedBtn}
+                ${historyBtn}
+                ${collapseBtn}
                 <button class="px-2 py-1 rounded-lg text-xs btn btn-soft motion-safe" data-action="upload-clear-queue">清空队列</button>
               </div>
             </div>
@@ -1184,7 +1237,8 @@
               <div class="h-full" style="width: ${percent}%; background: linear-gradient(90deg, var(--primary), var(--accent));"></div>
             </div>
           </div>
-          <div class="px-3">${rows}</div>
+          ${uploadQueueCollapsed ? '' : `<div class="px-3">${rows || '<div class="py-4 text-sm muted">当前队列为空</div>'}</div>`}
+          ${historyPanel}
         </div>
       `
     }
@@ -1220,6 +1274,27 @@
         else uploadQueue = uploadQueue.filter(it => it && it.status !== 'queued' && it.status !== 'error')
         renderUploadQueue()
         toastSuccessFn('队列已清空')
+        return
+      }
+      if (action === 'upload-toggle-collapse') {
+        uploadQueueCollapsed = !uploadQueueCollapsed
+        try { localStorage.setItem(UPLOAD_QUEUE_COLLAPSED_KEY, uploadQueueCollapsed ? '1' : '0') } catch (e) {}
+        renderUploadQueue()
+        return
+      }
+      if (action === 'upload-toggle-history') {
+        showUploadHistory = !showUploadHistory
+        renderUploadQueue()
+        return
+      }
+      if (action === 'upload-clear-history') {
+        const ok = await confirmDialogFn({ title: '清空上传历史？', message: '将移除上次上传记录（不会影响知识库内容）。', confirmText: '清空', tone: 'danger' })
+        if (!ok) return
+        lastUploadHistory = []
+        showUploadHistory = false
+        try { localStorage.removeItem(LAST_UPLOAD_HISTORY_KEY) } catch (e) {}
+        renderUploadQueue()
+        toastSuccessFn('历史已清空')
       }
     })
 
@@ -1269,6 +1344,19 @@
           const first = (data.results || [])[0] || {}
           item.status = 'success'
           item.category = first.category || (first.status === 'success' ? '' : '')
+          if (typeof mergeLastUploadSuccess === 'function') {
+            lastUploadSuccess = mergeLastUploadSuccess(lastUploadSuccess, item)
+          } else {
+            const category = String(item.category || '').trim()
+            const filename = String(item.name || '').trim()
+            if (category && filename) {
+              const k = highlightKey(category, filename)
+              const arr = Array.isArray(lastUploadSuccess) ? lastUploadSuccess.slice() : []
+              if (!arr.some(x => x && highlightKey(x.category, x.filename) === k)) arr.push({ category, filename })
+              lastUploadSuccess = arr
+            }
+          }
+          writeJson(LAST_UPLOAD_SUCCESS_KEY, lastUploadSuccess)
         } else {
           item.status = 'error'
           item.message = data.message || String(response.status)
@@ -1293,6 +1381,18 @@
             })()
           showStatus(`上传完成：成功 ${prog.success || 0}，失败 ${prog.fail || 0}。`, true)
           toastInfoFn('上传完成', `成功 ${prog.success || 0}，失败 ${prog.fail || 0}`)
+          if (typeof snapshotUploadHistory === 'function') lastUploadHistory = snapshotUploadHistory(uploadQueue)
+          else lastUploadHistory = uploadQueue.map(it => ({ id: String((it && it.id) || ''), name: String((it && it.name) || ''), status: String((it && it.status) || ''), category: String((it && it.category) || ''), message: String((it && it.message) || '') }))
+          writeJson(LAST_UPLOAD_HISTORY_KEY, lastUploadHistory)
+          renderUploadQueue()
+
+          if (typeof shouldAutoClearFilters === 'function' ? shouldAutoClearFilters(filterActive) : filterActive) {
+            if (filterActive) {
+              clearFilters(false)
+              toastInfoFn('已清除筛选以展示新上传文件')
+            }
+          }
+          location.hash = '#/library'
           await loadStats()
         }
       }
@@ -1424,6 +1524,31 @@
       }
     }
 
+    function highlightKey(category, filename) {
+      if (typeof makeHighlightKey === 'function') return makeHighlightKey(category, filename)
+      return String(category || '') + '::' + String(filename || '')
+    }
+
+    function applyLastUploadHighlights() {
+      const items = Array.isArray(lastUploadSuccess) ? lastUploadSuccess.slice() : []
+      if (!items.length) return
+      const keys = items.map(it => highlightKey(it && it.category, it && it.filename))
+      const matches = []
+      ;(kbStats && kbStats.querySelectorAll ? kbStats.querySelectorAll('[data-file-key]') : []).forEach(el => {
+        const k = el.getAttribute('data-file-key') || ''
+        if (k && keys.includes(k)) matches.push(el)
+      })
+      if (matches.length) {
+        matches.forEach(el => el.classList.add('kb-highlight'))
+        try { matches[0].scrollIntoView({ block: 'center', behavior: 'smooth' }) } catch (e) { try { matches[0].scrollIntoView() } catch (e2) {} }
+        const reduce = (() => { try { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches } catch (e) { return false } })()
+        const clear = () => matches.forEach(el => el.classList.remove('kb-highlight'))
+        setTimeout(clear, reduce ? 0 : 2500)
+      }
+      lastUploadSuccess = []
+      writeJson(LAST_UPLOAD_SUCCESS_KEY, [])
+    }
+
     async function loadStats() {
       const base = getApiBase()
       if (!base) {
@@ -1458,12 +1583,13 @@
                   const lower = n.toLowerCase()
                   const canSplit = !lower.endsWith('.questions.json') && (lower.endsWith('.md') || lower.endsWith('.txt') || lower.endsWith('.csv'))
                   const key = category + '::' + n
+                  const fileKey = highlightKey(category, n)
                   const checked = selectedKb.has(key) ? 'checked' : ''
                   const fav = isFavorited(category, n)
                   const favIcon = fav ? '★' : '☆'
                   const favCls = fav ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-gray-600'
                   return `
-                  <li class="text-sm text-gray-600 flex items-center justify-between group">
+                  <li class="text-sm text-gray-600 flex items-center justify-between group" data-file-key="${escapeAttr(fileKey)}">
                     <div class="flex items-center before:content-[''] before:w-2 before:h-[1px] before:bg-gray-300 before:mr-2 before:-ml-5">
                       <input type="checkbox" class="mr-2 h-4 w-4" data-kb-select="1" data-key="${escapeAttr(key)}" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(n)}" ${checked}>
                       <span class="truncate max-w-[220px]" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
@@ -1492,6 +1618,7 @@
             : renderEmptyState({ icon: 'search', title: '没有匹配的文件', desc: '尝试清除筛选条件或刷新目录。', primaryText: '清除筛选', action: 'clear-filters' })
         }
         updateBulkBar()
+        applyLastUploadHighlights()
       } catch (error) {
         kbStats.innerHTML = `<p class="text-red-500 text-sm">加载失败: ${escapeHtml(error && error.message ? error.message : String(error))}</p>`
       }

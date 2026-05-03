@@ -51,13 +51,56 @@
     })
   }
 
+  function makeHighlightKey(category, filename) {
+    return String(category || '') + '::' + String(filename || '')
+  }
+
+  function mergeLastUploadSuccess(prev, item) {
+    const arr = Array.isArray(prev) ? prev.slice() : []
+    if (!item || normStatus(item.status) !== 'success') return arr
+    const category = String(item.category || '').trim()
+    const filename = String(item.name || '').trim()
+    if (!category || !filename) return arr
+    const k = makeHighlightKey(category, filename)
+    if (arr.some(x => x && makeHighlightKey(x.category, x.filename) === k)) return arr
+    arr.push({ category, filename })
+    return arr
+  }
+
+  function snapshotUploadHistory(queue) {
+    const items = Array.isArray(queue) ? queue : []
+    return items.map(it => ({
+      id: String((it && it.id) || ''),
+      name: String((it && it.name) || ''),
+      status: normStatus(it && it.status),
+      category: String((it && it.category) || ''),
+      message: String((it && it.message) || ''),
+    }))
+  }
+
+  function shouldAutoClearFilters(filterActive) {
+    return !!filterActive
+  }
+
   global.calcUploadProgress = calcUploadProgress
   global.retryOneUpload = retryOne
   global.retryFailedUploads = retryFailed
   global.clearUploadQueue = clearQueue
+  global.makeHighlightKey = makeHighlightKey
+  global.mergeLastUploadSuccess = mergeLastUploadSuccess
+  global.snapshotUploadHistory = snapshotUploadHistory
+  global.shouldAutoClearFilters = shouldAutoClearFilters
 
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { calcUploadProgress, retryOne, retryFailed, clearQueue }
+    module.exports = {
+      calcUploadProgress,
+      retryOne,
+      retryFailed,
+      clearQueue,
+      makeHighlightKey,
+      mergeLastUploadSuccess,
+      snapshotUploadHistory,
+      shouldAutoClearFilters,
+    }
   }
 })(typeof window !== 'undefined' ? window : globalThis)
-
