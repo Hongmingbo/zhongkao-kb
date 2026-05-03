@@ -134,6 +134,7 @@
       <nav class="mt-5 flex items-center gap-2" style="border-bottom: 1px solid var(--border);">
         <button data-tab="upload" class="px-4 py-2 -mb-px text-sm font-medium">上传</button>
         <button data-tab="library" class="px-4 py-2 -mb-px text-sm font-medium">知识库</button>
+        <button data-tab="favorites" class="px-4 py-2 -mb-px text-sm font-medium">收藏</button>
         <button data-tab="search" class="px-4 py-2 -mb-px text-sm font-medium">搜索</button>
         <button data-tab="trash" class="px-4 py-2 -mb-px text-sm font-medium">回收站与设置</button>
       </nav>
@@ -245,6 +246,24 @@
             </div>
           </aside>
         </div>
+      </section>
+
+      <section data-page="favorites" class="hidden card accent-card p-6 rounded-xl shadow-sm">
+        <h2 class="text-xl font-semibold mb-4 flex items-center">
+          <svg class="w-5 h-5 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.954a1 1 0 00.95.69h4.157c.969 0 1.371 1.24.588 1.81l-3.363 2.444a1 1 0 00-.364 1.118l1.286 3.954c.3.921-.755 1.688-1.539 1.118l-3.363-2.444a1 1 0 00-1.175 0l-3.363 2.444c-.783.57-1.838-.197-1.539-1.118l1.286-3.954a1 1 0 00-.364-1.118L2.07 9.381c-.783-.57-.38-1.81.588-1.81h4.157a1 1 0 00.95-.69l1.286-3.954z"/></svg>
+          收藏
+        </h2>
+        <div class="rounded-lg p-3 mb-4 flex flex-wrap items-center justify-between gap-2" style="border: 1px solid var(--border); background: var(--card);">
+          <div class="flex items-center gap-3 text-sm">
+            <span class="muted">已选 <span id="favorites-selected-count">0</span></span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="favoritesSelectAllBtn" class="btn btn-soft btn-sm motion-safe">全选/取消</button>
+            <button id="favoritesClearSelectionBtn" class="btn btn-soft btn-sm motion-safe">清空选择</button>
+            <button id="favoritesBulkUnfavoriteBtn" class="btn btn-primary btn-sm motion-safe">批量取消收藏</button>
+          </div>
+        </div>
+        <div id="favorites-list"></div>
       </section>
 
       <section data-page="search" class="hidden card accent-card p-6 rounded-xl shadow-sm">
@@ -570,6 +589,7 @@
   <script src="./upload_queue.js"></script>
   <script src="./usability.js"></script>
   <script src="./safety.js"></script>
+  <script src="./favorites_view.js"></script>
   <script src="./mobile_preview.js"></script>
   <script>
     const dropZone = document.getElementById('drop-zone')
@@ -598,6 +618,11 @@
     const bulkMoveBtn = document.getElementById('bulkMoveBtn')
     const bulkMetaBtn = document.getElementById('bulkMetaBtn')
     const bulkBatchRenameBtn = document.getElementById('bulkBatchRenameBtn')
+    const favoritesList = document.getElementById('favorites-list')
+    const favoritesSelectedCount = document.getElementById('favorites-selected-count')
+    const favoritesSelectAllBtn = document.getElementById('favoritesSelectAllBtn')
+    const favoritesClearSelectionBtn = document.getElementById('favoritesClearSelectionBtn')
+    const favoritesBulkUnfavoriteBtn = document.getElementById('favoritesBulkUnfavoriteBtn')
     const searchQueryInput = document.getElementById('searchQuery')
     const searchCategorySelect = document.getElementById('searchCategory')
     const searchBtn = document.getElementById('searchBtn')
@@ -853,11 +878,12 @@
         sec.classList.toggle('hidden', (sec.getAttribute('data-page') || '') !== name)
       })
       try { localStorage.setItem('ZKKB_ACTIVE_TAB', name) } catch (e) {}
+      if (name === 'favorites') renderFavorites()
     }
 
     function parseTabFromHash() {
       const h = (location.hash || '').replace(/^#\/?/, '')
-      if (['upload', 'library', 'search', 'trash'].includes(h)) return h
+      if (['upload', 'library', 'favorites', 'search', 'trash'].includes(h)) return h
       return ''
     }
 
@@ -1059,6 +1085,10 @@
       toastInfoFn(favorited ? '已收藏' : '已取消收藏')
 
       const tab = parseTabFromHash()
+      if (tab === 'favorites') {
+        await renderFavorites()
+        return
+      }
       if (tab === 'search') {
         await runSearch()
         return
@@ -1067,6 +1097,97 @@
         if (filterActive) await applyFilters()
         else await loadStats()
       }
+    }
+
+    const selectedFavorites = new Set()
+    let favoritesLastViewKeys = []
+
+    function updateFavoritesSelectionCount() {
+      if (favoritesSelectedCount) favoritesSelectedCount.textContent = String(selectedFavorites.size)
+      if (favoritesBulkUnfavoriteBtn) favoritesBulkUnfavoriteBtn.disabled = selectedFavorites.size === 0
+    }
+
+    async function fetchStatsData() {
+      try {
+        const r = await apiFetch('/api/stats')
+        const data = await r.json().catch(() => ({}))
+        if (r.ok && data && typeof data === 'object') return data
+      } catch (e) {}
+      return {}
+    }
+
+    function renderFavoritesEmpty() {
+      if (!favoritesList) return
+      favoritesList.innerHTML = renderEmptyState({
+        icon: 'star',
+        title: '暂无收藏',
+        desc: '在知识库或搜索结果点击“★”即可收藏。',
+      })
+      favoritesLastViewKeys = []
+      selectedFavorites.clear()
+      updateFavoritesSelectionCount()
+    }
+
+    async function renderFavorites() {
+      if (!favoritesList) return
+      const base = getApiBase()
+      if (!base) {
+        favoritesList.innerHTML = renderEmptyState({ icon: 'search', title: '请先配置后端地址', desc: '当前前端无法连接到后端 API。' })
+        return
+      }
+      favoritesList.innerHTML = renderSkeletonList(6, 'library')
+      await loadFavorites()
+      if (!favorites.size) { renderFavoritesEmpty(); return }
+      const stats = await fetchStatsData()
+      const view = (typeof buildFavoritesView === 'function')
+        ? buildFavoritesView(favorites, stats)
+        : { groups: [] }
+      if (!view || !Array.isArray(view.groups) || !view.groups.length) { renderFavoritesEmpty(); return }
+      const keys = []
+      const html = view.groups.map(g => {
+        const category = String(g.category || '')
+        const items = Array.isArray(g.items) ? g.items : []
+        return `
+          <div class="mb-6">
+            <h3 class="text-lg font-semibold mb-3 flex items-center" style="color: var(--text);">
+              <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+              ${escapeHtml(category)} (${items.length})
+            </h3>
+            <div class="rounded-lg p-4" style="border: 1px solid var(--border); background: var(--card);">
+              <ul class="space-y-2">
+                ${items.map(it => {
+                  const filename = String(it.filename || '')
+                  const missing = !!it.missing
+                  const k = category + '::' + filename
+                  keys.push(k)
+                  const checked = selectedFavorites.has(k) ? 'checked' : ''
+                  const missingChip = missing ? '<span class="ml-2 chip chip-danger">已不存在</span>' : ''
+                  const actions = missing
+                    ? `<button class="btn btn-sm motion-safe text-red-500 hover:text-red-700" data-action="remove-missing" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename)}">移除收藏</button>`
+                    : `
+                      <button class="btn btn-sm motion-safe text-blue-500 hover:text-blue-700" data-action="preview" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename)}">预览</button>
+                      <button class="btn btn-sm motion-safe" style="color: var(--muted);" data-action="copy-name" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename)}">复制文件名</button>
+                      <button class="btn btn-sm motion-safe text-red-500 hover:text-red-700" data-action="unfavorite" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename)}">取消收藏</button>
+                    `
+                  return `
+                    <li class="text-sm text-gray-600 flex items-center justify-between group">
+                      <div class="flex items-center min-w-0">
+                        <input type="checkbox" class="mr-2 h-4 w-4" data-fav-select="1" data-key="${escapeAttr(k)}" ${checked}>
+                        <span class="truncate max-w-[420px]" title="${escapeAttr(filename)}">${escapeHtml(filename)}</span>
+                        ${missingChip}
+                      </div>
+                      <div class="hidden group-hover:flex space-x-2">${actions}</div>
+                    </li>
+                  `
+                }).join('')}
+              </ul>
+            </div>
+          </div>
+        `
+      }).join('')
+      favoritesList.innerHTML = html
+      favoritesLastViewKeys = keys.slice()
+      updateFavoritesSelectionCount()
     }
 
     function renderDailyQuote(data) {
@@ -1952,6 +2073,78 @@
     }
     bindSearchResults(searchResults)
     bindSearchResults(searchResults2)
+
+    if (favoritesList) {
+      favoritesList.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button')
+        if (!btn) return
+        const action = btn.getAttribute('data-action') || ''
+        const category = btn.getAttribute('data-category') || ''
+        const filename = btn.getAttribute('data-filename') || ''
+        if (action === 'copy-name' && filename) { await copyWithToast(filename); return }
+        if (action === 'preview' && category && filename) { await previewFile(category, filename); return }
+        if ((action === 'unfavorite' || action === 'remove-missing') && category && filename) {
+          await withDisabledFn(btn, async () => {
+            const k = favoriteKey(category, filename)
+            if (favorites.has(k)) await toggleFavorite(category, filename)
+            else await renderFavorites()
+          })
+        }
+      })
+      favoritesList.addEventListener('change', (e) => {
+        const el = e.target
+        if (!el || el.getAttribute('data-fav-select') !== '1') return
+        const k = el.getAttribute('data-key') || ''
+        if (!k) return
+        if (el.checked) selectedFavorites.add(k)
+        else selectedFavorites.delete(k)
+        updateFavoritesSelectionCount()
+      })
+    }
+    if (favoritesSelectAllBtn) {
+      favoritesSelectAllBtn.addEventListener('click', () => {
+        const keys = Array.isArray(favoritesLastViewKeys) ? favoritesLastViewKeys : []
+        if (!keys.length) return
+        const all = keys.every(k => selectedFavorites.has(k))
+        selectedFavorites.clear()
+        if (!all) keys.forEach(k => selectedFavorites.add(k))
+        if (favoritesList) {
+          favoritesList.querySelectorAll('input[data-fav-select="1"]').forEach(input => {
+            const k = input.getAttribute('data-key') || ''
+            input.checked = !all && k && selectedFavorites.has(k)
+          })
+        }
+        updateFavoritesSelectionCount()
+      })
+    }
+    if (favoritesClearSelectionBtn) {
+      favoritesClearSelectionBtn.addEventListener('click', () => {
+        selectedFavorites.clear()
+        if (favoritesList) favoritesList.querySelectorAll('input[data-fav-select="1"]').forEach(input => { input.checked = false })
+        updateFavoritesSelectionCount()
+      })
+    }
+    if (favoritesBulkUnfavoriteBtn) {
+      favoritesBulkUnfavoriteBtn.addEventListener('click', async () => {
+        await withDisabledFn(favoritesBulkUnfavoriteBtn, async () => {
+          const keys = Array.from(selectedFavorites)
+          if (!keys.length) return
+          const ok = await confirmDialogFn({ title: '批量取消收藏？', message: `将取消 ${keys.length} 个收藏项。`, confirmText: '取消收藏', tone: 'danger' })
+          if (!ok) return
+          for (const k of keys) {
+            const parts = String(k || '').split('::')
+            const category = parts[0] || ''
+            const filename = parts.slice(1).join('::') || ''
+            if (!category || !filename) continue
+            if (!favorites.has(favoriteKey(category, filename))) continue
+            await toggleFavorite(category, filename)
+          }
+          selectedFavorites.clear()
+          await renderFavorites()
+          toastSuccessFn('已取消收藏', `共 ${keys.length} 个`)
+        })
+      })
+    }
 
     document.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-empty-action]')
@@ -2888,7 +3081,7 @@
     ;(() => {
       const fromHash = parseTabFromHash()
       const remembered = (() => { try { return localStorage.getItem('ZKKB_ACTIVE_TAB') || '' } catch (e) { return '' } })()
-      const init = fromHash || (['upload', 'library', 'search', 'trash'].includes(remembered) ? remembered : 'upload')
+      const init = fromHash || (['upload', 'library', 'favorites', 'search', 'trash'].includes(remembered) ? remembered : 'upload')
       if (!fromHash) location.hash = '#/' + init
       setActiveTab(init)
     })()
