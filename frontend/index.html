@@ -606,6 +606,7 @@
   <script src="./safety.js"></script>
   <script src="./favorites_view.js"></script>
   <script src="./favorites_tools.js"></script>
+  <script src="./cache_tools.js"></script>
   <script src="./download_internals.js"></script>
   <script src="./mobile_preview.js"></script>
   <script>
@@ -770,6 +771,8 @@
     const downloadFileFn = (globalThis && globalThis._downloadInternals && typeof globalThis._downloadInternals.downloadFile === 'function')
       ? globalThis._downloadInternals.downloadFile
       : null
+    const shouldUseCacheFn = typeof shouldUseCache === 'function' ? shouldUseCache : (() => false)
+    const makeSearchCacheKeyFn = typeof makeSearchCacheKey === 'function' ? makeSearchCacheKey : (() => '')
     const readJson = (key, fallback) => {
       try {
         const raw = localStorage.getItem(key)
@@ -1111,6 +1114,7 @@
         return
       }
       if (!silent) toastInfoFn(favorited ? '已收藏' : '已取消收藏')
+      invalidateSearchCache()
       if (skipRefresh) return
 
       const tab = parseTabFromHash()
@@ -1140,10 +1144,22 @@
         return []
       }
     })()
+    const STATS_TTL_MS = 30000
+    const SEARCH_TTL_MS = 60000
+    let statsCache = { data: null, ts: 0 }
+    const searchCache = new Map()
 
     function updateFavoritesSelectionCount() {
       if (favoritesSelectedCount) favoritesSelectedCount.textContent = String(selectedFavorites.size)
       if (favoritesBulkUnfavoriteBtn) favoritesBulkUnfavoriteBtn.disabled = selectedFavorites.size === 0
+    }
+
+    function invalidateStatsCache() {
+      statsCache = { data: null, ts: 0 }
+    }
+
+    function invalidateSearchCache() {
+      searchCache.clear()
     }
 
     function savePinnedCategories() {
@@ -1160,11 +1176,17 @@
       if (current) favoritesCategorySelect.value = current
     }
 
-    async function fetchStatsData() {
+    async function fetchStatsData(force) {
+      if (!force && statsCache && statsCache.data && shouldUseCacheFn({ ts: statsCache.ts, ttlMs: STATS_TTL_MS })) {
+        return statsCache.data
+      }
       try {
         const r = await apiFetch('/api/stats')
         const data = await r.json().catch(() => ({}))
-        if (r.ok && data && typeof data === 'object') return data
+        if (r.ok && data && typeof data === 'object') {
+          statsCache = { data, ts: Date.now() }
+          return data
+        }
       } catch (e) {}
       return {}
     }
@@ -1599,6 +1621,7 @@
             }
           }
           location.hash = '#/library'
+          invalidateStatsCache()
           await loadStats()
         }
       }
@@ -1689,6 +1712,7 @@
         }
         toastSuccessFn('已恢复')
         await loadTrash()
+        invalidateStatsCache()
         if (filterActive) await applyFilters()
         else await loadStats()
       } catch (e) {
@@ -1708,6 +1732,7 @@
         }
         toastSuccessFn('已删除')
         await loadTrash()
+        invalidateStatsCache()
       } catch (e) {
         toastErrorFn('删除失败', e && e.message ? e.message : '')
       }
@@ -1725,6 +1750,7 @@
         }
         toastSuccessFn('已清空')
         await loadTrash()
+        invalidateStatsCache()
       } catch (e) {
         toastErrorFn('清空失败', e && e.message ? e.message : '')
       }
@@ -1763,8 +1789,7 @@
       }
       try {
         kbStats.innerHTML = renderSkeletonList(6, 'kb')
-        const response = await apiFetch('/api/stats')
-        const data = await response.json()
+        const data = await fetchStatsData(false)
         await loadFilterOptions()
         if (!data || Object.keys(data).length === 0) {
           kbStats.innerHTML = renderEmptyState({ icon: 'upload', title: '知识库还是空的', desc: '先去上传一些文件吧。', primaryText: '去上传', action: 'go-upload' })
@@ -1972,9 +1997,20 @@
         return
       }
       const category = (searchCategorySelect.value || '').trim()
+      const onlyFav = !!(searchFavoritesCheckbox && searchFavoritesCheckbox.checked)
+      const limit = 20
+      const context = 60
+      const key = makeSearchCacheKeyFn({ q, category, onlyFav, limit, context })
+      const altKey = makeSearchCacheKeyFn({ q, category, onlyFav: !onlyFav, limit, context })
       const params = new URLSearchParams({ q })
       if (category) params.set('category', category)
       try {
+        const cached = (key && searchCache.get(key)) || (altKey && searchCache.get(altKey)) || null
+        if (cached && cached.data && shouldUseCacheFn({ ts: cached.ts, ttlMs: SEARCH_TTL_MS })) {
+          if (key && !searchCache.has(key)) searchCache.set(key, cached)
+          renderSearchResults(cached.data)
+          return
+        }
         ;[searchResults, searchResults2].forEach(el => {
           if (!el) return
           el.classList.remove('hidden')
@@ -1991,6 +2027,7 @@
           })
           return
         }
+        if (key) searchCache.set(key, { data, ts: Date.now() })
         renderSearchResults(data)
       } catch (e) {
         ;[searchResults, searchResults2].forEach(el => {
@@ -2047,6 +2084,7 @@
               <div class="flex items-center gap-2">
                 <button class="${favCls} text-xs motion-safe star-hover" data-action="favorite" data-category="${escapeAttr(r.category || '')}" data-filename="${escapeAttr(r.filename || '')}" aria-label="收藏">${favIcon}</button>
                 <button class="btn btn-sm motion-safe" style="color: var(--muted);" data-action="copy-name" data-category="${escapeAttr(r.category || '')}" data-filename="${escapeAttr(r.filename || '')}">复制文件名</button>
+                <button class="btn btn-sm motion-safe" style="color: var(--muted);" data-action="download" data-category="${escapeAttr(r.category || '')}" data-filename="${escapeAttr(r.filename || '')}">下载</button>
                 <button class="btn btn-sm motion-safe" style="color: var(--primary);" data-action="preview" data-category="${escapeAttr(r.category || '')}" data-filename="${escapeAttr(r.filename || '')}">预览</button>
               </div>
             </div>
@@ -2548,6 +2586,7 @@
           selectedKb.delete(category + '::' + old_filename)
           selectedKb.add(category + '::' + finalName)
           updateBulkBar()
+          invalidateStatsCache()
           if (filterActive) await applyFilters()
           else await loadStats()
           setTimeout(hideRenameModal, 400)
@@ -2630,6 +2669,7 @@
           selectedKb.add(cat + '::' + newName)
         })
         updateBulkBar()
+        invalidateStatsCache()
         if (filterActive) await applyFilters()
         else await loadStats()
         setTimeout(hideBatchRenameModal, 400)
@@ -2650,6 +2690,7 @@
         const data = await response.json().catch(() => ({}))
         if (response.ok && data.status === 'success') {
           toastSuccessFn('已移入回收站', data.message || '')
+          invalidateStatsCache()
           if (filterActive) await applyFilters()
           else await loadStats()
           return
@@ -2778,6 +2819,7 @@
           toastInfoFn('已移入回收站', `成功 ${okCount}，失败 ${failCount}`)
           selectedKb.clear()
           updateBulkBar()
+          invalidateStatsCache()
           if (filterActive) await applyFilters()
           else await loadStats()
         } catch (e) {
@@ -2815,6 +2857,7 @@
           toastInfoFn('已移动', `成功 ${okCount}，失败 ${failCount}`)
           selectedKb.clear()
           updateBulkBar()
+          invalidateStatsCache()
           if (filterActive) await applyFilters()
           else await loadStats()
         } catch (e) {
@@ -2854,6 +2897,7 @@
           toastInfoFn('已恢复', `成功 ${okCount}，失败 ${failCount}`)
           selectedTrash.clear()
           await loadTrash()
+          invalidateStatsCache()
           if (filterActive) await applyFilters()
           else await loadStats()
         } catch (e) {
@@ -2983,6 +3027,7 @@
           const failCount = results.length - okCount
           metaMsg.textContent = `更新完成：成功 ${okCount}，失败 ${failCount}`
           metaMsg.className = failCount ? 'text-sm text-amber-700' : 'text-sm text-green-700'
+          invalidateStatsCache()
           if (filterActive) await applyFilters()
           else await loadStats()
         } catch (e) {
@@ -3199,6 +3244,7 @@
             uploadQueue = []
             renderUploadQueue()
             clearFilters(false)
+            invalidateStatsCache()
             await loadStats()
             clearSearch()
             return
