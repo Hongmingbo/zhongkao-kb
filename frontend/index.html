@@ -253,14 +253,29 @@
           <svg class="w-5 h-5 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.954a1 1 0 00.95.69h4.157c.969 0 1.371 1.24.588 1.81l-3.363 2.444a1 1 0 00-.364 1.118l1.286 3.954c.3.921-.755 1.688-1.539 1.118l-3.363-2.444a1 1 0 00-1.175 0l-3.363 2.444c-.783.57-1.838-.197-1.539-1.118l1.286-3.954a1 1 0 00-.364-1.118L2.07 9.381c-.783-.57-.38-1.81.588-1.81h4.157a1 1 0 00.95-.69l1.286-3.954z"/></svg>
           收藏
         </h2>
-        <div class="rounded-lg p-3 mb-4 flex flex-wrap items-center justify-between gap-2" style="border: 1px solid var(--border); background: var(--card);">
-          <div class="flex items-center gap-3 text-sm">
-            <span class="muted">已选 <span id="favorites-selected-count">0</span></span>
+        <div class="rounded-lg p-3 mb-4 flex flex-col gap-2" style="border: 1px solid var(--border); background: var(--card);">
+          <div class="flex flex-col sm:flex-row gap-2">
+            <input id="favoritesQuery" class="flex-1 px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);" placeholder="搜索收藏（文件名）">
+            <select id="favoritesCategory" class="px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);">
+              <option value="">全部学科</option>
+            </select>
+            <label class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style="border: 1px solid var(--border); background: var(--card); color: var(--text);">
+              <input id="favoritesHideMissing" type="checkbox" class="h-4 w-4">
+              <span>仅存在文件</span>
+            </label>
           </div>
-          <div class="flex items-center gap-2">
-            <button id="favoritesSelectAllBtn" class="btn btn-soft btn-sm motion-safe">全选/取消</button>
-            <button id="favoritesClearSelectionBtn" class="btn btn-soft btn-sm motion-safe">清空选择</button>
-            <button id="favoritesBulkUnfavoriteBtn" class="btn btn-primary btn-sm motion-safe">批量取消收藏</button>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-3 text-sm">
+              <span class="muted">已选 <span id="favorites-selected-count">0</span></span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="favoritesExportBtn" class="btn btn-soft btn-sm motion-safe">导出 JSON</button>
+              <input id="favoritesImportFile" type="file" accept="application/json" class="hidden">
+              <button id="favoritesImportBtn" class="btn btn-soft btn-sm motion-safe">导入 JSON</button>
+              <button id="favoritesSelectAllBtn" class="btn btn-soft btn-sm motion-safe">全选/取消</button>
+              <button id="favoritesClearSelectionBtn" class="btn btn-soft btn-sm motion-safe">清空选择</button>
+              <button id="favoritesBulkUnfavoriteBtn" class="btn btn-primary btn-sm motion-safe">批量取消收藏</button>
+            </div>
           </div>
         </div>
         <div id="favorites-list"></div>
@@ -590,6 +605,7 @@
   <script src="./usability.js"></script>
   <script src="./safety.js"></script>
   <script src="./favorites_view.js"></script>
+  <script src="./favorites_tools.js"></script>
   <script src="./mobile_preview.js"></script>
   <script>
     const dropZone = document.getElementById('drop-zone')
@@ -619,6 +635,12 @@
     const bulkMetaBtn = document.getElementById('bulkMetaBtn')
     const bulkBatchRenameBtn = document.getElementById('bulkBatchRenameBtn')
     const favoritesList = document.getElementById('favorites-list')
+    const favoritesQueryInput = document.getElementById('favoritesQuery')
+    const favoritesCategorySelect = document.getElementById('favoritesCategory')
+    const favoritesHideMissingCheckbox = document.getElementById('favoritesHideMissing')
+    const favoritesExportBtn = document.getElementById('favoritesExportBtn')
+    const favoritesImportBtn = document.getElementById('favoritesImportBtn')
+    const favoritesImportFile = document.getElementById('favoritesImportFile')
     const favoritesSelectedCount = document.getElementById('favorites-selected-count')
     const favoritesSelectAllBtn = document.getElementById('favoritesSelectAllBtn')
     const favoritesClearSelectionBtn = document.getElementById('favoritesClearSelectionBtn')
@@ -1061,8 +1083,10 @@
       } catch (e) {}
     }
 
-    async function toggleFavorite(category, filename) {
+    async function toggleFavorite(category, filename, opts) {
       let favorited = false
+      const silent = !!(opts && opts.silent)
+      const skipRefresh = !!(opts && opts.skipRefresh)
       try {
         const r = await apiFetch('/api/favorites/toggle', {
           method: 'POST',
@@ -1082,7 +1106,8 @@
         toastErrorFn('操作失败', e && e.message ? e.message : '')
         return
       }
-      toastInfoFn(favorited ? '已收藏' : '已取消收藏')
+      if (!silent) toastInfoFn(favorited ? '已收藏' : '已取消收藏')
+      if (skipRefresh) return
 
       const tab = parseTabFromHash()
       if (tab === 'favorites') {
@@ -1101,10 +1126,34 @@
 
     const selectedFavorites = new Set()
     let favoritesLastViewKeys = []
+    const FAVORITES_PINNED_KEY = 'ZKKB_FAVORITES_PINNED_CATEGORIES'
+    let favoritesPinnedCategories = (() => {
+      try {
+        const raw = localStorage.getItem(FAVORITES_PINNED_KEY)
+        const arr = raw ? JSON.parse(raw) : []
+        return Array.isArray(arr) ? arr.map(x => String(x || '')) : []
+      } catch (e) {
+        return []
+      }
+    })()
 
     function updateFavoritesSelectionCount() {
       if (favoritesSelectedCount) favoritesSelectedCount.textContent = String(selectedFavorites.size)
       if (favoritesBulkUnfavoriteBtn) favoritesBulkUnfavoriteBtn.disabled = selectedFavorites.size === 0
+    }
+
+    function savePinnedCategories() {
+      try { localStorage.setItem(FAVORITES_PINNED_KEY, JSON.stringify(favoritesPinnedCategories)) } catch (e) {}
+    }
+
+    function setFavoritesCategoryOptions(groups) {
+      if (!favoritesCategorySelect) return
+      const current = String(favoritesCategorySelect.value || '')
+      const categories = (Array.isArray(groups) ? groups : []).map(g => String(g && g.category || '')).filter(Boolean)
+      const unique = Array.from(new Set(categories))
+      unique.sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'))
+      favoritesCategorySelect.innerHTML = `<option value="">全部学科</option>` + unique.map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join('')
+      if (current) favoritesCategorySelect.value = current
     }
 
     async function fetchStatsData() {
@@ -1143,15 +1192,36 @@
         ? buildFavoritesView(favorites, stats)
         : { groups: [] }
       if (!view || !Array.isArray(view.groups) || !view.groups.length) { renderFavoritesEmpty(); return }
+      const q = favoritesQueryInput ? (favoritesQueryInput.value || '').trim() : ''
+      const cat = favoritesCategorySelect ? (favoritesCategorySelect.value || '').trim() : ''
+      const hideMissing = !!(favoritesHideMissingCheckbox && favoritesHideMissingCheckbox.checked)
+      const pinnedOrderedGroups = (typeof applyPinnedCategoryOrder === 'function')
+        ? applyPinnedCategoryOrder(view.groups, favoritesPinnedCategories)
+        : view.groups.slice()
+      setFavoritesCategoryOptions(view.groups)
       const keys = []
-      const html = view.groups.map(g => {
+      const html = pinnedOrderedGroups.map(g => {
         const category = String(g.category || '')
-        const items = Array.isArray(g.items) ? g.items : []
+        const rawItems = Array.isArray(g.items) ? g.items : []
+        const items = (typeof applyFavoritesFilters === 'function')
+          ? applyFavoritesFilters(rawItems.map(it => ({
+            key: category + '::' + String(it && it.filename || ''),
+            category,
+            filename: String(it && it.filename || ''),
+            missing: !!(it && it.missing),
+          })), { query: q, category: cat, hideMissing }).map(x => ({ filename: x.filename, missing: x.missing }))
+          : rawItems
+        if (!items.length) return ''
+        const pinned = favoritesPinnedCategories.includes(category)
+        const pinText = pinned ? '取消置顶' : '置顶'
         return `
           <div class="mb-6">
-            <h3 class="text-lg font-semibold mb-3 flex items-center" style="color: var(--text);">
+            <h3 class="text-lg font-semibold mb-3 flex items-center justify-between gap-2" style="color: var(--text);">
+              <div class="flex items-center min-w-0">
               <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
               ${escapeHtml(category)} (${items.length})
+              </div>
+              <button class="btn btn-soft btn-sm motion-safe" data-action="pin-category" data-category="${escapeAttr(category)}">${pinText}</button>
             </h3>
             <div class="rounded-lg p-4" style="border: 1px solid var(--border); background: var(--card);">
               <ul class="space-y-2">
@@ -2083,6 +2153,14 @@
         const filename = btn.getAttribute('data-filename') || ''
         if (action === 'copy-name' && filename) { await copyWithToast(filename); return }
         if (action === 'preview' && category && filename) { await previewFile(category, filename); return }
+        if (action === 'pin-category' && category) {
+          favoritesPinnedCategories = (typeof togglePinnedCategory === 'function')
+            ? togglePinnedCategory(favoritesPinnedCategories, category)
+            : (favoritesPinnedCategories.includes(category) ? favoritesPinnedCategories.filter(x => x !== category) : favoritesPinnedCategories.concat([category]))
+          savePinnedCategories()
+          await renderFavorites()
+          return
+        }
         if ((action === 'unfavorite' || action === 'remove-missing') && category && filename) {
           await withDisabledFn(btn, async () => {
             const k = favoriteKey(category, filename)
@@ -2101,6 +2179,11 @@
         updateFavoritesSelectionCount()
       })
     }
+    ;[favoritesQueryInput, favoritesCategorySelect, favoritesHideMissingCheckbox].forEach(el => {
+      if (!el) return
+      el.addEventListener('input', () => { if (parseTabFromHash() === 'favorites') renderFavorites() })
+      el.addEventListener('change', () => { if (parseTabFromHash() === 'favorites') renderFavorites() })
+    })
     if (favoritesSelectAllBtn) {
       favoritesSelectAllBtn.addEventListener('click', () => {
         const keys = Array.isArray(favoritesLastViewKeys) ? favoritesLastViewKeys : []
@@ -2137,11 +2220,68 @@
             const filename = parts.slice(1).join('::') || ''
             if (!category || !filename) continue
             if (!favorites.has(favoriteKey(category, filename))) continue
-            await toggleFavorite(category, filename)
+            await toggleFavorite(category, filename, { silent: true, skipRefresh: true })
           }
           selectedFavorites.clear()
           await renderFavorites()
           toastSuccessFn('已取消收藏', `共 ${keys.length} 个`)
+        })
+      })
+    }
+    if (favoritesExportBtn) {
+      favoritesExportBtn.addEventListener('click', async () => {
+        await withDisabledFn(favoritesExportBtn, async () => {
+          await loadFavorites()
+          const json = (typeof exportFavoritesJson === 'function')
+            ? exportFavoritesJson(favorites)
+            : JSON.stringify({ version: 1, exported_at: new Date().toISOString(), items: Array.from(favorites).map(k => {
+              const parts = String(k || '').split('::')
+              return { category: parts[0] || '', filename: parts.slice(1).join('::') || '' }
+            }) }, null, 2)
+          const blob = new Blob([json], { type: 'application/json;charset=utf-8' })
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = 'favorites.json'
+          document.body.appendChild(a)
+          a.click()
+          a.remove()
+          setTimeout(() => URL.revokeObjectURL(url), 500)
+          toastSuccessFn('已导出收藏', `共 ${favorites.size} 个`)
+        })
+      })
+    }
+    if (favoritesImportBtn && favoritesImportFile) {
+      favoritesImportBtn.addEventListener('click', () => { try { favoritesImportFile.click() } catch (e) {} })
+      favoritesImportFile.addEventListener('change', async () => {
+        const file = favoritesImportFile.files && favoritesImportFile.files[0]
+        if (!file) return
+        favoritesImportFile.value = ''
+        await withDisabledFn(favoritesImportBtn, async () => {
+          try {
+            const text = await file.text()
+            const parsed = (typeof parseFavoritesJson === 'function') ? parseFavoritesJson(text) : { ok: false, reason: '解析失败', items: [] }
+            if (!parsed.ok) { toastErrorFn('导入失败', parsed.reason || 'JSON 不合法'); return }
+            await loadFavorites()
+            const before = new Set(Array.from(favorites))
+            const mergedInfo = (typeof mergeFavoriteItems === 'function')
+              ? mergeFavoriteItems(before, parsed.items)
+              : { merged: before, added: 0 }
+            const merged = mergedInfo.merged
+            const toAdd = Array.from(merged).filter(k => !before.has(k))
+            for (const k of toAdd) {
+              const parts = String(k || '').split('::')
+              const category = parts[0] || ''
+              const filename = parts.slice(1).join('::') || ''
+              if (!category || !filename) continue
+              if (favorites.has(favoriteKey(category, filename))) continue
+              await toggleFavorite(category, filename, { silent: true, skipRefresh: true })
+            }
+            await renderFavorites()
+            toastSuccessFn('导入完成', `导入 ${parsed.items.length}，新增 ${toAdd.length}`)
+          } catch (e) {
+            toastErrorFn('导入失败', e && e.message ? e.message : '')
+          }
         })
       })
     }
