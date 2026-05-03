@@ -58,15 +58,20 @@
     .btn-danger { background: #dc2626; color: #fff; }
     .btn-danger:hover { background: #b91c1c; }
     .btn:active { transform: translateY(1px); }
+    .btn:disabled, .btn.is-disabled { opacity: .55; pointer-events: none; }
+    .btn-sm { padding: 6px 10px; font-size: 12px; line-height: 16px; border-radius: .625rem; }
+    .btn-md { padding: 8px 14px; font-size: 14px; line-height: 18px; border-radius: .75rem; }
     .focus-ring:focus { outline: none; box-shadow: 0 0 0 4px var(--ring); }
     .card-border { border: 1px solid var(--border); }
     .bg-card { background: var(--card); }
     .bg-soft { background: rgba(148,163,184,0.08); }
     .text-muted { color: var(--muted); }
     .chip { display: inline-flex; align-items: center; gap: .25rem; padding: .125rem .5rem; border-radius: 999px; font-size: 10px; border: 1px solid var(--border); color: var(--muted); background: rgba(148,163,184,0.10); }
+    .chip-sm { padding: .0625rem .4rem; font-size: 10px; line-height: 14px; }
     .chip-accent { border-color: rgba(6,182,212,0.35); color: var(--accent); background: rgba(6,182,212,0.10); }
     .chip-warning { border-color: rgba(245,158,11,0.35); color: #f59e0b; background: rgba(245,158,11,0.10); }
     .chip-danger { border-color: rgba(239,68,68,0.35); color: #ef4444; background: rgba(239,68,68,0.10); }
+    .row-item { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .5rem 0; }
     .card-hover:hover { transform: translateY(-1px); box-shadow: 0 12px 30px rgba(2,8,23,0.10); }
     html[data-theme="dark"] .card-hover:hover { box-shadow: 0 12px 30px rgba(0,0,0,0.35); }
     .star-hover:hover { transform: scale(1.08); }
@@ -536,11 +541,11 @@
     <div class="px-4 py-3 card-border border-b flex items-center justify-between gap-2">
       <div class="min-w-0 flex items-center gap-2">
         <div id="mobile-preview-title" class="text-sm font-semibold truncate" style="color: var(--text);">预览</div>
-        <span id="mobile-preview-badge" class="chip">—</span>
+        <span id="mobile-preview-badge" class="chip chip-sm">—</span>
       </div>
       <div class="flex items-center gap-2 shrink-0">
-        <button id="mobile-preview-toggle" class="px-2 py-1 rounded-lg text-xs btn btn-soft motion-safe">展开</button>
-        <button id="mobile-preview-close" class="px-2 py-1 rounded-lg text-xs btn btn-soft motion-safe">关闭</button>
+        <button id="mobile-preview-toggle" class="btn btn-soft btn-sm motion-safe">展开</button>
+        <button id="mobile-preview-close" class="btn btn-soft btn-sm motion-safe">关闭</button>
       </div>
     </div>
     <div id="mobile-preview-body" class="p-4 sheet-body"></div>
@@ -1165,7 +1170,7 @@
             ? `<span class="ml-2 text-xs text-red-600 break-words">${escapeHtml(item.message)}</span>`
             : ''
         const action = item.status === 'error'
-          ? `<button class="px-2 py-1 rounded-lg text-xs btn btn-soft motion-safe" data-action="upload-retry-one" data-id="${escapeAttr(item.id)}">重试</button>`
+          ? `<button class="btn btn-soft btn-sm motion-safe" data-action="upload-retry-one" data-id="${escapeAttr(item.id)}">重试</button>`
           : ''
 
         return `
@@ -1183,14 +1188,14 @@
         ? `<span class="chip chip-danger">失败 ${prog.fail}</span>`
         : ''
       const retryFailedBtn = prog.fail
-        ? `<button class="px-2 py-1 rounded-lg text-xs btn btn-soft motion-safe" data-action="upload-retry-failed">重试失败</button>`
+        ? `<button class="btn btn-soft btn-sm motion-safe" data-action="upload-retry-failed">重试失败</button>`
         : ''
-      const collapseBtn = `<button class="px-2 py-1 rounded-lg text-xs btn btn-soft motion-safe" data-action="upload-toggle-collapse">${uploadQueueCollapsed ? '展开明细' : '折叠明细'}</button>`
+      const collapseBtn = `<button class="btn btn-soft btn-sm motion-safe" data-action="upload-toggle-collapse">${uploadQueueCollapsed ? '展开明细' : '折叠明细'}</button>`
       const historyBtn = (lastUploadHistory && lastUploadHistory.length)
-        ? `<button class="px-2 py-1 rounded-lg text-xs btn btn-soft motion-safe" data-action="upload-toggle-history">${showUploadHistory ? '隐藏上次' : '上次记录'}</button>`
+        ? `<button class="btn btn-soft btn-sm motion-safe" data-action="upload-toggle-history">${showUploadHistory ? '隐藏上次' : '上次记录'}</button>`
         : ''
       const clearHistoryBtn = (showUploadHistory && lastUploadHistory && lastUploadHistory.length)
-        ? `<button class="px-2 py-1 rounded-lg text-xs btn btn-soft motion-safe" data-action="upload-clear-history">清空历史</button>`
+        ? `<button class="btn btn-soft btn-sm motion-safe" data-action="upload-clear-history">清空历史</button>`
         : ''
 
       const historyPanel = (showUploadHistory && lastUploadHistory && lastUploadHistory.length)
@@ -1230,7 +1235,7 @@
                 ${retryFailedBtn}
                 ${historyBtn}
                 ${collapseBtn}
-                <button class="px-2 py-1 rounded-lg text-xs btn btn-soft motion-safe" data-action="upload-clear-queue">清空队列</button>
+                <button class="btn btn-soft btn-sm motion-safe" data-action="upload-clear-queue">清空队列</button>
               </div>
             </div>
             <div class="mt-2 h-2 rounded-full" style="background: rgba(148,163,184,0.18); border: 1px solid var(--border); overflow: hidden;">
@@ -1451,9 +1456,9 @@
                   </div>
                 </div>
                 <div class="flex gap-2 shrink-0">
-              <button class="px-3 py-1.5 rounded-lg text-xs btn btn-primary motion-safe" data-action="trash-restore" data-id="${escapeAttr(it.id || '')}">恢复</button>
-              <button class="px-3 py-1.5 rounded-lg text-xs btn btn-soft motion-safe" data-action="copy-name" data-filename="${escapeAttr(it.filename || '')}">复制文件名</button>
-              <button class="px-3 py-1.5 rounded-lg text-xs btn btn-soft motion-safe" data-action="trash-delete" data-id="${escapeAttr(it.id || '')}">彻底删除</button>
+              <button class="btn btn-primary btn-sm motion-safe" data-action="trash-restore" data-id="${escapeAttr(it.id || '')}">恢复</button>
+              <button class="btn btn-soft btn-sm motion-safe" data-action="copy-name" data-filename="${escapeAttr(it.filename || '')}">复制文件名</button>
+              <button class="btn btn-soft btn-sm motion-safe" data-action="trash-delete" data-id="${escapeAttr(it.id || '')}">彻底删除</button>
                 </div>
               </div>
             `).join('')}
@@ -1597,11 +1602,11 @@
                     </div>
                     <div class="hidden group-hover:flex space-x-2">
                     <button class="${favCls} text-xs motion-safe star-hover" data-action="favorite" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}" aria-label="收藏">${favIcon}</button>
-                    <button class="text-xs" style="color: var(--muted);" data-action="copy-name" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">复制文件名</button>
-                      <button class="text-blue-500 hover:text-blue-700 text-xs" data-action="preview" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">预览</button>
-                      ${canSplit ? `<button class="text-indigo-500 hover:text-indigo-700 text-xs" data-action="split" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">拆题</button>` : ''}
-                      <button class="text-xs" style="color: var(--muted);" data-action="rename" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">重命名</button>
-                      <button class="text-red-500 hover:text-red-700 text-xs" data-action="delete" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">删除</button>
+                      <button class="btn btn-sm motion-safe" style="color: var(--muted);" data-action="copy-name" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">复制文件名</button>
+                      <button class="btn btn-sm motion-safe text-blue-500 hover:text-blue-700" data-action="preview" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">预览</button>
+                      ${canSplit ? `<button class="btn btn-sm motion-safe text-indigo-500 hover:text-indigo-700" data-action="split" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">拆题</button>` : ''}
+                      <button class="btn btn-sm motion-safe" style="color: var(--muted);" data-action="rename" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">重命名</button>
+                      <button class="btn btn-sm motion-safe text-red-500 hover:text-red-700" data-action="delete" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">删除</button>
                     </div>
                   </li>
                 `
@@ -1734,10 +1739,10 @@
                   </div>
                   <div class="hidden group-hover:flex space-x-2">
                     <button class="${favCls} text-xs motion-safe star-hover" data-action="favorite" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}" aria-label="收藏">${favIcon}</button>
-                    <button class="text-xs" style="color: var(--muted);" data-action="copy-name" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">复制文件名</button>
-                    <button class="text-blue-500 hover:text-blue-700 text-xs" data-action="preview" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">预览</button>
-                    ${canSplit ? `<button class="text-indigo-500 hover:text-indigo-700 text-xs" data-action="split" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">拆题</button>` : ''}
-                    <button class="text-red-500 hover:text-red-700 text-xs" data-action="delete" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">删除</button>
+                    <button class="btn btn-sm motion-safe" style="color: var(--muted);" data-action="copy-name" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">复制文件名</button>
+                    <button class="btn btn-sm motion-safe text-blue-500 hover:text-blue-700" data-action="preview" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">预览</button>
+                    ${canSplit ? `<button class="btn btn-sm motion-safe text-indigo-500 hover:text-indigo-700" data-action="split" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">拆题</button>` : ''}
+                    <button class="btn btn-sm motion-safe text-red-500 hover:text-red-700" data-action="delete" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(f.name)}">删除</button>
                   </div>
                 </li>
               `
@@ -1838,8 +1843,8 @@
               </div>
               <div class="flex items-center gap-2">
                 <button class="${favCls} text-xs motion-safe star-hover" data-action="favorite" data-category="${escapeAttr(r.category || '')}" data-filename="${escapeAttr(r.filename || '')}" aria-label="收藏">${favIcon}</button>
-                <button class="text-xs" style="color: var(--muted);" data-action="copy-name" data-category="${escapeAttr(r.category || '')}" data-filename="${escapeAttr(r.filename || '')}">复制文件名</button>
-                <button class="text-xs" style="color: var(--primary);" data-action="preview" data-category="${escapeAttr(r.category || '')}" data-filename="${escapeAttr(r.filename || '')}">预览</button>
+                <button class="btn btn-sm motion-safe" style="color: var(--muted);" data-action="copy-name" data-category="${escapeAttr(r.category || '')}" data-filename="${escapeAttr(r.filename || '')}">复制文件名</button>
+                <button class="btn btn-sm motion-safe" style="color: var(--primary);" data-action="preview" data-category="${escapeAttr(r.category || '')}" data-filename="${escapeAttr(r.filename || '')}">预览</button>
               </div>
             </div>
             ${matches}
@@ -2013,7 +2018,7 @@
       const download = rawUrl ? `
         <div class="flex items-center gap-2 flex-wrap">
           <a class="text-sm" style="color: var(--primary);" href="${escapeAttr(rawUrl)}" target="_blank" rel="noopener">下载/打开原文件</a>
-          <button class="text-xs btn btn-soft motion-safe px-2 py-1 rounded-lg" data-action="copy-link" data-url="${escapeAttr(rawUrl)}">复制链接</button>
+          <button class="btn btn-soft btn-sm motion-safe" data-action="copy-link" data-url="${escapeAttr(rawUrl)}">复制链接</button>
         </div>
       ` : ''
       if (rawUrl && ['.png', '.jpg', '.jpeg', '.webp'].includes(ext)) {
@@ -2030,7 +2035,7 @@
           <div class="space-y-3">
             <div class="flex items-center justify-between gap-2">
               <div>${download}</div>
-              <button class="text-sm px-3 py-2 rounded-lg btn btn-soft motion-safe" data-action="preview-derived" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename + '.md')}">查看提取文本</button>
+              <button class="btn btn-soft btn-sm motion-safe" data-action="preview-derived" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename + '.md')}">查看提取文本</button>
             </div>
             <iframe src="${escapeAttr(rawUrl)}" class="w-full h-[70vh] rounded-lg card-border bg-card"></iframe>
           </div>
@@ -2041,7 +2046,7 @@
         el.innerHTML = `
           <div class="space-y-3">
             <div>${download}</div>
-            <button class="text-sm px-3 py-2 rounded-lg btn btn-soft motion-safe" data-action="preview-derived" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename + '.md')}">查看提取文本</button>
+            <button class="btn btn-soft btn-sm motion-safe" data-action="preview-derived" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename + '.md')}">查看提取文本</button>
             <p class="muted italic">${escapeHtml(data.content || '')}</p>
           </div>
         `
