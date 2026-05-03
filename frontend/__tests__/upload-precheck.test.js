@@ -34,5 +34,11 @@ describe('upload_precheck', () => {
     expect(r.summary.empty).toBe(1)
     expect(r.summary.unsupported).toBe(1)
   })
-})
 
+  test('rejects duplicates against existing queue names', () => {
+    const existingNames = new Set(['a.txt'])
+    const r = precheckFiles([fileLike('a.txt', 10, 'text/plain'), fileLike('b.txt', 10, 'text/plain')], { maxFileMb: 50, existingNames })
+    expect(r.accepted.map(x => x.name)).toEqual(['b.txt'])
+    expect(r.rejected.map(x => x.reason)).toEqual(['duplicate_name'])
+  })
+})

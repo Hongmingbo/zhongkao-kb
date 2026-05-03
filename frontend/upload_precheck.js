@@ -27,6 +27,13 @@
     const rejected = []
     const summary = { empty: 0, too_large: 0, unsupported: 0, duplicate_name: 0 }
     const seen = new Set()
+    const existingNames = o.existingNames instanceof Set ? o.existingNames : null
+    if (existingNames) {
+      existingNames.forEach(n => {
+        const k = safeString(n).trim().toLowerCase()
+        if (k) seen.add(k)
+      })
+    }
 
     list.forEach(f => {
       const name = safeString(f && f.name).trim()
@@ -67,4 +74,3 @@
     module.exports = { precheckFiles }
   }
 })(typeof window !== 'undefined' ? window : globalThis)
-

@@ -1572,8 +1572,9 @@
 
       if (!picked.length) return
 
+      const existingNames = new Set(uploadQueue.map(it => String(it && it.name || '').trim().toLowerCase()).filter(Boolean))
       const precheck = (typeof precheckFiles === 'function')
-        ? precheckFiles(picked, { maxFileMb: 50 })
+        ? precheckFiles(picked, { maxFileMb: 50, existingNames })
         : { accepted: picked, rejected: [], summary: { empty: 0, too_large: 0, unsupported: 0, duplicate_name: 0 } }
       const accepted = Array.isArray(precheck.accepted) ? precheck.accepted : []
       const rejected = Array.isArray(precheck.rejected) ? precheck.rejected : []
@@ -1583,7 +1584,15 @@
         if (sum.empty) parts.push(`空文件 ${sum.empty}`)
         if (sum.too_large) parts.push(`超限 ${sum.too_large}`)
         if (sum.unsupported) parts.push(`不支持 ${sum.unsupported}`)
-        if (sum.duplicate_name) parts.push(`同名重复 ${sum.duplicate_name}`)
+        if (sum.duplicate_name) {
+          parts.push(`同名重复 ${sum.duplicate_name}`)
+          const names = rejected.filter(x => x && x.reason === 'duplicate_name').map(x => String(x.name || '')).filter(Boolean)
+          const shown = names.slice(0, 3)
+          if (shown.length) {
+            const suffix = names.length > shown.length ? '…' : ''
+            parts.push(`示例：${shown.join('、')}${suffix}`)
+          }
+        }
         showStatus(`已跳过 ${rejected.length} 个文件：${parts.join(' / ')}`, false)
       }
       if (!accepted.length) return
