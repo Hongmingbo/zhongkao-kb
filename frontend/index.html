@@ -538,6 +538,7 @@
   </div>
 
   <script src="./feedback.js"></script>
+  <script src="./upload_queue.js"></script>
   <script>
     const dropZone = document.getElementById('drop-zone')
     const fileInput = document.getElementById('file-upload')
@@ -1086,6 +1087,18 @@
 
       uploadQueueEl.classList.remove('hidden')
 
+      const prog = (typeof calcUploadProgress === 'function')
+        ? calcUploadProgress(uploadQueue)
+        : (() => {
+          const total = uploadQueue.length
+          const success = uploadQueue.filter(x => x.status === 'success').length
+          const fail = uploadQueue.filter(x => x.status === 'error').length
+          const uploading = uploadQueue.filter(x => x.status === 'uploading').length
+          const queued = uploadQueue.filter(x => x.status === 'queued').length
+          return { total, done: success + fail, success, fail, queued, uploading }
+        })()
+      const percent = prog.total ? Math.round((prog.done / prog.total) * 100) : 0
+
       const badge = (status) => {
         if (status === 'queued') return '<span class="chip">等待</span>'
         if (status === 'uploading') return '<span class="chip chip-accent">上传中</span>'
@@ -1099,6 +1112,9 @@
           : item.status === 'error' && item.message
             ? `<span class="ml-2 text-xs text-red-600 break-words">${escapeHtml(item.message)}</span>`
             : ''
+        const action = item.status === 'error'
+          ? `<button class="px-2 py-1 rounded-lg text-xs btn btn-soft motion-safe" data-action="upload-retry-one" data-id="${escapeAttr(item.id)}">重试</button>`
+          : ''
 
         return `
           <div class="flex items-start justify-between gap-2 py-2" style="border-bottom: 1px solid var(--border);">
@@ -1106,17 +1122,74 @@
               <div class="text-sm truncate" style="color: var(--text);" title="${escapeAttr(item.name)}">${escapeHtml(item.name)}</div>
               <div class="mt-1 flex items-center gap-2">${badge(item.status)}${right}</div>
             </div>
+            <div class="shrink-0">${action}</div>
           </div>
         `
       }).join('')
 
+      const failChip = prog.fail
+        ? `<span class="chip chip-danger">失败 ${prog.fail}</span>`
+        : ''
+      const retryFailedBtn = prog.fail
+        ? `<button class="px-2 py-1 rounded-lg text-xs btn btn-soft motion-safe" data-action="upload-retry-failed">重试失败</button>`
+        : ''
+
       uploadQueueEl.innerHTML = `
         <div class="rounded-lg card-border bg-card">
-          <div class="px-3 py-2 card-border border-b text-sm font-medium" style="color: var(--text);">批量上传队列</div>
+          <div class="px-3 py-2 card-border border-b">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <div class="text-sm font-medium truncate" style="color: var(--text);">批量上传队列</div>
+                <span class="chip">已完成 ${prog.done} / ${prog.total}</span>
+                ${failChip}
+              </div>
+              <div class="flex items-center gap-2">
+                ${retryFailedBtn}
+                <button class="px-2 py-1 rounded-lg text-xs btn btn-soft motion-safe" data-action="upload-clear-queue">清空队列</button>
+              </div>
+            </div>
+            <div class="mt-2 h-2 rounded-full" style="background: rgba(148,163,184,0.18); border: 1px solid var(--border); overflow: hidden;">
+              <div class="h-full" style="width: ${percent}%; background: linear-gradient(90deg, var(--primary), var(--accent));"></div>
+            </div>
+          </div>
           <div class="px-3">${rows}</div>
         </div>
       `
     }
+
+    uploadQueueEl.addEventListener('click', async (e) => {
+      const btn = e.target.closest('button')
+      if (!btn) return
+      const action = btn.getAttribute('data-action') || ''
+      if (action === 'upload-retry-one') {
+        const id = btn.getAttribute('data-id') || ''
+        if (!id) return
+        if (typeof retryOneUpload === 'function') uploadQueue = retryOneUpload(uploadQueue, id)
+        else uploadQueue = uploadQueue.map(it => (it && it.id === id && it.status === 'error') ? { ...it, status: 'queued', message: '', category: '' } : it)
+        renderUploadQueue()
+        pumpQueue()
+        toastInfoFn('已重新加入队列')
+        return
+      }
+      if (action === 'upload-retry-failed') {
+        const ok = await confirmDialogFn({ title: '重试失败项？', message: '将重新上传所有失败文件。', confirmText: '重试', tone: 'primary' })
+        if (!ok) return
+        if (typeof retryFailedUploads === 'function') uploadQueue = retryFailedUploads(uploadQueue)
+        else uploadQueue = uploadQueue.map(it => (it && it.status === 'error') ? { ...it, status: 'queued', message: '', category: '' } : it)
+        renderUploadQueue()
+        pumpQueue()
+        toastInfoFn('失败项已重新加入队列')
+        return
+      }
+      if (action === 'upload-clear-queue') {
+        const ok = await confirmDialogFn({ title: '清空上传队列？', message: '将移除等待/失败项，保留上传中与已成功项。', confirmText: '清空', tone: 'danger' })
+        if (!ok) return
+        if (typeof clearUploadQueue === 'function') uploadQueue = clearUploadQueue(uploadQueue)
+        else uploadQueue = uploadQueue.filter(it => it && it.status !== 'queued' && it.status !== 'error')
+        renderUploadQueue()
+        toastSuccessFn('队列已清空')
+      }
+    })
 
     function enqueueFiles(files) {
       const base = getApiBase()
@@ -1179,7 +1252,15 @@
         const hasQueued = uploadQueue.some(x => x.status === 'queued')
         const hasUploading = activeUploads > 0
         if (!hasQueued && !hasUploading) {
-          showStatus('批量上传已完成。', true)
+          const prog = (typeof calcUploadProgress === 'function')
+            ? calcUploadProgress(uploadQueue)
+            : (() => {
+              const success = uploadQueue.filter(x => x.status === 'success').length
+              const fail = uploadQueue.filter(x => x.status === 'error').length
+              return { success, fail }
+            })()
+          showStatus(`上传完成：成功 ${prog.success || 0}，失败 ${prog.fail || 0}。`, true)
+          toastInfoFn('上传完成', `成功 ${prog.success || 0}，失败 ${prog.fail || 0}`)
           await loadStats()
         }
       }
