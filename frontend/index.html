@@ -123,12 +123,10 @@
           <div class="brand-bar mt-2"></div>
           <div id="daily-quote" class="text-sm mt-1 muted"></div>
         </div>
-        <div id="user-bar" class="hidden text-sm muted">
-          <img id="avatarImg" class="w-9 h-9 rounded-full object-cover" style="border: 1px solid var(--border);" alt="avatar">
-          <span id="current-user" class="ml-2 font-medium" style="color: var(--text);"></span>
-          <button id="themeToggleBtn" class="ml-3 btn btn-soft motion-safe px-3 py-2 rounded-lg text-xs">深色</button>
-          <button id="settingsBtn" class="ml-2" style="color: var(--primary);">设置</button>
-          <button id="logoutBtn" class="ml-3" style="color: #ef4444;">退出</button>
+        <div id="user-bar" class="hidden text-sm muted flex items-center gap-2">
+          <button id="themeToggleBtn" class="btn btn-soft motion-safe px-3 py-2 rounded-lg text-xs">深色</button>
+          <button id="settingsBtn" class="btn btn-soft motion-safe px-3 py-2 rounded-lg text-xs">设置</button>
+          <button id="logoutBtn" class="btn btn-soft motion-safe px-3 py-2 rounded-lg text-xs" style="color: #ef4444;">退出</button>
         </div>
       </div>
       <nav class="mt-5 flex items-center gap-2" style="border-bottom: 1px solid var(--border);">
@@ -205,17 +203,19 @@
             <div id="kb-stats" class="space-y-4 max-h-[520px] overflow-y-auto">
               <p class="text-sm muted">加载中...</p>
             </div>
-            <div id="bulk-bar" class="hidden mt-4 p-3 rounded-lg flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2" style="border: 1px solid rgba(6,182,212,0.25); background: rgba(6,182,212,0.06);">
+            <div id="bulk-bar" class="hidden mt-4 p-3 rounded-lg space-y-2" style="border: 1px solid rgba(6,182,212,0.25); background: rgba(6,182,212,0.06);">
               <div class="text-sm" style="color: var(--text);"><span id="bulk-count">已选择 0 个</span></div>
-              <div class="flex flex-wrap gap-2">
-                <select id="bulkTargetCategory" class="px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);">
+              <div class="flex flex-col sm:flex-row flex-wrap gap-2">
+                <select id="bulkTargetCategory" class="w-full sm:w-auto px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);">
                   <option value="">选择目标学科</option>
                 </select>
-                <button id="bulkCancelBtn" class="px-3 py-2 rounded-lg text-sm btn btn-soft motion-safe">取消选择</button>
-                <button id="bulkTrashBtn" class="px-3 py-2 rounded-lg text-sm btn btn-primary motion-safe">批量移入回收站</button>
-                <button id="bulkMoveBtn" class="px-3 py-2 rounded-lg text-sm btn btn-soft motion-safe">批量移动</button>
-                <button id="bulkMetaBtn" class="px-3 py-2 rounded-lg text-sm btn btn-accent motion-safe">批量改标签</button>
-                <button id="bulkBatchRenameBtn" class="px-3 py-2 rounded-lg text-sm btn btn-soft motion-safe">批量重命名</button>
+                <div class="flex flex-wrap gap-2">
+                  <button id="bulkCancelBtn" class="px-3 py-2 rounded-lg text-sm btn btn-soft motion-safe">取消选择</button>
+                  <button id="bulkTrashBtn" class="px-3 py-2 rounded-lg text-sm btn btn-primary motion-safe">批量移入回收站</button>
+                  <button id="bulkMoveBtn" class="px-3 py-2 rounded-lg text-sm btn btn-soft motion-safe">批量移动</button>
+                  <button id="bulkMetaBtn" class="px-3 py-2 rounded-lg text-sm btn btn-accent motion-safe">批量改标签</button>
+                  <button id="bulkBatchRenameBtn" class="px-3 py-2 rounded-lg text-sm btn btn-soft motion-safe">批量重命名</button>
+                </div>
               </div>
             </div>
             <div class="flex flex-wrap gap-4 mt-4">
@@ -682,7 +682,7 @@
     const registerPassword = document.getElementById('registerPassword')
     const registerBtn = document.getElementById('registerBtn')
     const userBar = document.getElementById('user-bar')
-    const avatarImg = document.getElementById('avatarImg')
+    const profileAvatarPreviewTop = document.getElementById('avatarImg')
     const currentUserEl = document.getElementById('current-user')
     const themeToggleBtn = document.getElementById('themeToggleBtn')
     const settingsBtn = document.getElementById('settingsBtn')
@@ -924,11 +924,9 @@
     function renderUserBar(user) {
       if (user && user.username) {
         userBar.classList.remove('hidden')
-        currentUserEl.textContent = user.nickname ? user.nickname : user.username
         return
       }
       userBar.classList.add('hidden')
-      currentUserEl.textContent = ''
     }
 
     function setProfileMsg(text, ok) {
@@ -943,8 +941,7 @@
     function showProfileModal() {
       profileModal.classList.remove('hidden')
       setProfileMsg('', true)
-      nicknameInput.value = currentUserEl.textContent || ''
-      profileAvatarPreview.src = avatarImg.src || ''
+      nicknameInput.value = ''
       if (nicknameInputPage) nicknameInputPage.value = nicknameInput.value || ''
       if (profileAvatarPreviewPage) profileAvatarPreviewPage.src = profileAvatarPreview.src || ''
     }
@@ -1007,7 +1004,9 @@
         const blob = await r.blob()
         if (avatarObjectUrl) URL.revokeObjectURL(avatarObjectUrl)
         avatarObjectUrl = URL.createObjectURL(blob)
-        avatarImg.src = avatarObjectUrl
+        if (profileAvatarPreviewTop) profileAvatarPreviewTop.src = avatarObjectUrl
+        profileAvatarPreview.src = avatarObjectUrl
+        if (profileAvatarPreviewPage) profileAvatarPreviewPage.src = avatarObjectUrl
       } catch (e) {}
     }
 
@@ -3279,8 +3278,9 @@
           return
         }
         await loadAvatar()
-        profileAvatarPreview.src = avatarImg.src || ''
-        if (profileAvatarPreviewPage) profileAvatarPreviewPage.src = avatarImg.src || ''
+        if (profileAvatarPreviewTop) profileAvatarPreviewTop.src = avatarObjectUrl
+        profileAvatarPreview.src = avatarObjectUrl
+        if (profileAvatarPreviewPage) profileAvatarPreviewPage.src = avatarObjectUrl
         setProfileMsg('头像已更新。', true)
       } catch (e) {
         setProfileMsg('上传失败', false)
@@ -3402,7 +3402,7 @@
           renderUserBar(data)
           await loadAvatar()
           if (nicknameInputPage) nicknameInputPage.value = data.nickname ? data.nickname : data.username
-          if (profileAvatarPreviewPage) profileAvatarPreviewPage.src = avatarImg.src || ''
+          if (profileAvatarPreviewPage) profileAvatarPreviewPage.src = avatarObjectUrl
           await loadFavorites()
           await loadStats()
           return
