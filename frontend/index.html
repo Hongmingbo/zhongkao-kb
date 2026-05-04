@@ -608,7 +608,6 @@
   <script src="./favorites_tools.js"></script>
   <script src="./cache_tools.js"></script>
   <script src="./download_internals.js"></script>
-  <script src="./preview_tools.js"></script>
   <script src="./upload_precheck.js"></script>
   <script src="./mobile_preview.js"></script>
   <script>
@@ -774,7 +773,9 @@
     const downloadFileFn = (globalThis && globalThis._downloadInternals && typeof globalThis._downloadInternals.downloadFile === 'function')
       ? globalThis._downloadInternals.downloadFile
       : null
-    const hydrateRawPreviewFn = typeof hydrateRawPreview === 'function' ? hydrateRawPreview : null
+    const hydrateRawPreviewFn = (globalThis && globalThis._downloadInternals && typeof globalThis._downloadInternals.hydrateRawPreview === 'function')
+      ? globalThis._downloadInternals.hydrateRawPreview
+      : null
     const shouldUseCacheFn = typeof shouldUseCache === 'function' ? shouldUseCache : (() => false)
     const makeSearchCacheKeyFn = typeof makeSearchCacheKey === 'function' ? makeSearchCacheKey : (() => '')
     const readJson = (key, fallback) => {
@@ -2481,7 +2482,7 @@
         el.innerHTML = `
           <div class="space-y-3">
             <div>${download}</div>
-            <div class="text-sm muted">加载预览中…</div>
+            <div class="text-sm muted" data-preview-loading="1">加载预览中…</div>
             <img data-preview-raw="1" class="max-w-full rounded-lg card-border bg-card" alt="preview">
           </div>
         `
@@ -2495,7 +2496,7 @@
               <div>${download}</div>
               <button class="btn btn-soft btn-sm motion-safe" data-action="preview-derived" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename + '.md')}">查看提取文本</button>
             </div>
-            <div class="text-sm muted">加载预览中…</div>
+            <div class="text-sm muted" data-preview-loading="1">加载预览中…</div>
             <iframe data-preview-raw="1" class="w-full h-[70vh] rounded-lg card-border bg-card"></iframe>
           </div>
         `

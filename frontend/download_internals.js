@@ -1,4 +1,42 @@
 (function (global) {
+  async function hydrateRawPreview(opts) {
+    const o = opts || {}
+    const container = o.container
+    const rawPath = String(o.rawPath || '')
+    const apiFetch = o.apiFetch || global.apiFetch
+    const toastError = o.toastError || global.toastError
+    if (!container || !rawPath || typeof apiFetch !== 'function') return false
+
+    try {
+      const prev = container.dataset ? (container.dataset.rawObjUrl || '') : ''
+      if (prev) {
+        try { URL.revokeObjectURL(prev) } catch (e) {}
+        try { delete container.dataset.rawObjUrl } catch (e) {}
+      }
+
+      const node = container.querySelector ? container.querySelector('[data-preview-raw="1"]') : null
+      if (!node) return false
+
+      const r = await apiFetch(rawPath)
+      if (!r || !r.ok) {
+        if (toastError) toastError('预览失败', String(r && r.status ? r.status : ''))
+        return false
+      }
+      const blob = await r.blob()
+      const url = URL.createObjectURL(blob)
+      if (container.dataset) container.dataset.rawObjUrl = url
+      if (container.querySelectorAll) container.querySelectorAll('[data-preview-loading="1"]').forEach(n => n.remove())
+      try {
+        if (node && node.tagName && node.tagName.toUpperCase() === 'IFRAME') node.setAttribute('src', url)
+        else node.src = url
+      } catch (e) {}
+      return true
+    } catch (e) {
+      if (toastError) toastError('预览失败', e && e.message ? e.message : '')
+      return false
+    }
+  }
+
   async function downloadFile(opts) {
     const o = opts || {}
     const category = String(o.category || '')
@@ -51,8 +89,7 @@
   }
 
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { downloadFile }
+    module.exports = { downloadFile, hydrateRawPreview }
   }
-  global._downloadInternals = { downloadFile }
+  global._downloadInternals = { downloadFile, hydrateRawPreview }
 })(typeof window !== 'undefined' ? window : globalThis)
-
