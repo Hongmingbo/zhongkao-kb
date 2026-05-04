@@ -112,6 +112,8 @@
     }
     .kb-highlight { background: rgba(6,182,212,0.12); border: 1px solid rgba(6,182,212,0.45); border-radius: .75rem; padding-left: .25rem; padding-right: .25rem; }
     html[data-theme="dark"] .kb-highlight { background: rgba(34,211,238,0.12); border-color: rgba(34,211,238,0.35); }
+    .preview-media { width: 100%; max-height: 70vh; object-fit: contain; display: block; }
+    .preview-iframe { width: 100%; height: 70vh; display: block; }
   </style>
 </head>
 <body class="min-h-screen font-sans">
@@ -203,14 +205,16 @@
             <div id="kb-stats" class="space-y-4 max-h-[520px] overflow-y-auto">
               <p class="text-sm muted">加载中...</p>
             </div>
-            <div id="bulk-bar" class="hidden mt-4 p-3 rounded-lg space-y-2" style="border: 1px solid rgba(6,182,212,0.25); background: rgba(6,182,212,0.06);">
-              <div class="text-sm" style="color: var(--text);"><span id="bulk-count">已选择 0 个</span></div>
-              <div class="flex flex-col sm:flex-row flex-wrap gap-2">
-                <select id="bulkTargetCategory" class="w-full sm:w-auto px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);">
+            <div id="bulk-bar" class="hidden mt-4 p-3 rounded-lg space-y-3" style="border: 1px solid rgba(6,182,212,0.25); background: rgba(6,182,212,0.06);">
+              <div class="flex items-center justify-between gap-2 flex-wrap">
+                <div class="text-sm font-medium" style="color: var(--text);"><span id="bulk-count">已选择 0 个</span></div>
+                <button id="bulkCancelBtn" class="px-3 py-2 rounded-lg text-sm btn btn-soft motion-safe">取消选择</button>
+              </div>
+              <div class="flex flex-col gap-2">
+                <select id="bulkTargetCategory" class="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus-ring" style="border: 1px solid var(--border); background: var(--card); color: var(--text);">
                   <option value="">选择目标学科</option>
                 </select>
                 <div class="flex flex-wrap gap-2">
-                  <button id="bulkCancelBtn" class="px-3 py-2 rounded-lg text-sm btn btn-soft motion-safe">取消选择</button>
                   <button id="bulkTrashBtn" class="px-3 py-2 rounded-lg text-sm btn btn-danger motion-safe">批量移入回收站</button>
                   <button id="bulkMoveBtn" class="px-3 py-2 rounded-lg text-sm btn btn-soft motion-safe">批量移动</button>
                   <button id="bulkMetaBtn" class="px-3 py-2 rounded-lg text-sm btn btn-soft motion-safe">批量改标签</button>
@@ -235,9 +239,9 @@
           </div>
           <aside id="library-preview" class="hidden lg:block lg:col-span-1">
             <div class="sticky top-4 rounded-xl p-4 accent-card" style="border: 1px solid var(--border); background: rgba(148,163,184,0.08);">
-              <div class="flex items-center justify-between gap-2">
-                <div class="flex items-center gap-2 min-w-0">
-                  <div class="text-sm font-semibold truncate" style="color: var(--text);" id="library-preview-title">预览</div>
+              <div class="flex items-start justify-between gap-2 flex-wrap">
+                <div class="flex items-center gap-2 min-w-0 flex-wrap">
+                  <div class="text-sm font-semibold break-words" style="color: var(--text);" id="library-preview-title">预览</div>
                   <span id="library-preview-badge" class="chip">—</span>
                 </div>
                 <button id="libraryPreviewClearBtn" class="text-xs btn btn-soft motion-safe px-2 py-1 rounded-lg">清空</button>
@@ -2480,7 +2484,7 @@
           <div class="space-y-3">
             <div>${download}</div>
             <div class="text-sm muted" data-preview-loading="1">加载预览中…</div>
-            <img data-preview-raw="1" class="w-full max-h-[70vh] object-contain rounded-lg card-border bg-card" alt="preview">
+            <img data-preview-raw="1" class="preview-media rounded-lg card-border bg-card" alt="preview">
           </div>
         `
         if (hydrateRawPreviewFn && data.raw_url) void hydrateRawPreviewFn({ container: el, rawPath: data.raw_url, apiFetch, toastError: toastErrorFn })
@@ -2494,7 +2498,7 @@
               <button class="btn btn-soft btn-sm motion-safe" data-action="preview-derived" data-category="${escapeAttr(category)}" data-filename="${escapeAttr(filename + '.md')}">查看提取文本</button>
             </div>
             <div class="text-sm muted" data-preview-loading="1">加载预览中…</div>
-            <iframe data-preview-raw="1" class="w-full h-[70vh] rounded-lg card-border bg-card"></iframe>
+            <iframe data-preview-raw="1" class="preview-iframe rounded-lg card-border bg-card"></iframe>
           </div>
         `
         if (hydrateRawPreviewFn && data.raw_url) void hydrateRawPreviewFn({ container: el, rawPath: data.raw_url, apiFetch, toastError: toastErrorFn })
